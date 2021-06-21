@@ -1,13 +1,11 @@
 import math
-from typing import Any, Iterable, Callable, Optional
+from typing import Any, Callable, Optional
 
 import jax
 from jax import numpy as jnp
 from jax import vmap
 
 PRNGKey = Any
-Shape = Iterable[int]
-Dtype = Any
 Array = Any
 
 
