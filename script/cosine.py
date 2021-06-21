@@ -21,7 +21,7 @@ def main():
     r = np.exp(x @ C)
     y = np.random.poisson(r)
 
-    fig, ax = plt.subplots(5, 1, sharex=True)
+    fig, ax = plt.subplots(5, 1, sharex='all')
     ax[0].plot(z)
     ax[1].plot(y)
     ax[2].imshow(y.T, aspect='auto')
@@ -32,7 +32,7 @@ def main():
 
     ax[3].plot(model.experiment.trials[0].z)
 
-    model.fit(max_iter=5)
+    model.fit(max_iter=20)
 
     ax[4].plot(model.experiment.trials[0].z)
     plt.show()

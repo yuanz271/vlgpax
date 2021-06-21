@@ -2,9 +2,9 @@ import jax
 from jax import numpy as jnp
 
 
-diag_embed = jax.vmap(jnp.diag)
+diag_embed = jax.jit(jax.vmap(jnp.diag))
 
-batch_lstsq = jax.vmap(lambda a, b: jnp.linalg.lstsq(a, b)[0])
+batch_lstsq = jax.jit(jax.vmap(lambda a, b: jnp.linalg.lstsq(a, b)[0]))
 
 
 def stable_solve(a, b):
@@ -20,3 +20,8 @@ def stable_solve(a, b):
         x = batch_lstsq(a, b)
 
     return x
+
+
+@jax.jit
+def capped_exp(x, c: float = 10.):
+    return jnp.exp(jnp.clip(x, a_max=c))
