@@ -11,6 +11,8 @@ class Params:
     lengthscale: Union[float, Sequence[float]] = 1.
     C: Optional[Any] = None  # (n_factors + n_regressors, n_channels)
     K: Optional[Any] = None  # (n_factors, T, T)
+    L: Optional[Any] = None  # (n_factors, T, T)
+    logdet: Optional[Any] = None  # (n_factors, T)
 
     def __post_init__(self):
         self.scale = jnp.asarray(self.scale)
@@ -30,6 +32,7 @@ class Trial:
     w: Optional[Any] = field(default=None, repr=False)
 
     def __post_init__(self):
+        self.y = jnp.asarray(self.y, dtype=float)
         if self.x is not None:
             assert self.y.shape[0] == self.x.shape[0]
         else:

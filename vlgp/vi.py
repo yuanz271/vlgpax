@@ -21,15 +21,16 @@
 # K: Array(M, T, T), prior kernel matrices, reference to some irredundant storage
 # L: Array(M, T, S), K ~= LL'
 ######################
+import math
 import time
-from typing import Union, Sequence, Tuple, Any
+from collections import Iterable
+from typing import Union, Sequence, Tuple, Any, Callable
 
 import click
 from jax import numpy as jnp
 from sklearn.decomposition import FactorAnalysis
 
-from .data import Session, Params
-from .gp import kernel
+from .data import Session, Params, Trial
 from .util import diag_embed, stable_solve as solve, capped_exp
 
 __all__ = ['Inference']
@@ -73,15 +74,14 @@ def trial_update(y, Cx, Cz, x, z, v, w, K, logdet, eps) -> Tuple[float, Any]:
     return loss, step
 
 
-def estep(infer, *, max_iter: int = 20, stepsize=.5, eps: float = 1e-8) -> jnp.ndarray:
-    params = infer.params
+def estep(session, params, *, max_iter: int = 20, stepsize=.5, eps: float = 1e-8) -> jnp.ndarray:
     zdim = params.n_factors
     C = params.C  # (zdim + xdim, ydim)
     Cz, Cx = jnp.vsplit(C, [zdim])  # (n_factors + n_regressors, n_channels)
 
     total_loss: jnp.ndarray = jnp.array(0.)
     total_T = 0
-    for trial in infer.session:  # parallelizable
+    for trial in session:  # parallelizable
         x = trial.x  # regressors
         z = trial.z
         y = trial.y
@@ -111,16 +111,15 @@ def estep(infer, *, max_iter: int = 20, stepsize=.5, eps: float = 1e-8) -> jnp.n
     return total_loss / total_T
 
 
-def mstep(infer, *, max_iter: int = 20, stepsize=.5):
-    params = infer.params
+def mstep(session, params, *, max_iter: int = 20, stepsize=.5):
     zdim = params.n_factors
     C = params.C  # (zdim + xdim, ydim)
 
     # concat trials
-    y = infer.session.y
-    x = infer.session.x
-    z = infer.session.z
-    v = infer.session.v
+    y = session.y
+    x = session.x
+    z = session.z
+    v = session.v
     M = jnp.column_stack((z, x))
 
     loss = jnp.inf
@@ -148,12 +147,41 @@ def mstep(infer, *, max_iter: int = 20, stepsize=.5):
     return loss
 
 
+def preprocess(session, params, initialize):
+    for trial in session:
+        T = trial.y.shape[0]
+        trial.z = jnp.asarray(initialize(trial.y))
+        assert trial.z.shape[0] == T
+        trial.v = jnp.tile(params.scale, (T, 1))
+        trial.w = jnp.ones_like(trial.z)
+        trial.K = params.K[T]
+        trial.L = params.L[T]
+        trial.logdet = params.logdet[T]
+
+
+def make_em_session(session, T) -> Session:
+    y = session.y
+    x = session.x
+    em_session = Session(session.binsize, session.unit)
+    n_trials = y.shape[0] // T
+    y = y[:n_trials * T]
+    x = x[:n_trials * T]
+    for i, (yi, xi) in enumerate(zip(jnp.split(y, n_trials), jnp.split(x, n_trials))):
+        em_session.add_trial(Trial(i, y=yi, x=xi))
+
+    return em_session
+
+
 class Inference:
-    def __init__(self, session: Session, n_factors: int, *,
+    def __init__(self, session: Session,
+                 n_factors: int,
+                 kernel: Union[Callable, Sequence[Callable]], *,
                  scale: Union[float, Sequence[float]] = 1.,
                  lengthscale: Union[float, Sequence[float]] = 1.):
         self.session = session
         self.params = Params(n_factors, scale, lengthscale)
+        self.kernel = kernel
+        self.em_session = None  # for quick EM
         self.init()
 
     def init(self):
@@ -161,10 +189,21 @@ class Inference:
         trial = self.session.trials[0]
         n_channels = trial.y.shape[-1]
         n_regressors = trial.x.shape[-1]
-        self.params.C = jnp.zeros((self.params.n_factors + n_regressors, n_channels))
-        unique_Ts = jnp.unique([trial.y.shape[0] for trial in self.session])
-        ks = [kernel.RBF(scale, lengthscale, jitter=1e-3) for scale, lengthscale in
-              zip(self.params.scale, self.params.lengthscale)]
+        n_factors = self.params.n_factors
+
+        fa = FactorAnalysis(n_components=self.params.n_factors)
+        y = self.session.y
+        fa = fa.fit(y)
+
+        T_em = math.floor(max(self.params.lengthscale) / self.session.binsize)
+        self.em_session = make_em_session(self.session, T_em)
+
+        # init params
+        self.params.C = jnp.zeros((n_factors + n_regressors, n_channels))
+        Ts = [trial.y.shape[0] for trial in self.session]
+        Ts.append(T_em)
+        unique_Ts = jnp.unique(Ts)
+        ks = self.kernel if isinstance(self.kernel, Iterable) else [self.kernel] * n_factors
         self.params.K = {
             T: jnp.stack([k(jnp.arange(T * self.session.binsize, step=self.session.binsize)) for k in ks]) for T
             in unique_Ts}
@@ -177,48 +216,45 @@ class Inference:
             for T, L in self.params.L.items()
         }
 
-        for trial in self.session:
-            trial.K = self.params.K[trial.y.shape[0]]
-            trial.L = self.params.L[trial.y.shape[0]]
-            trial.logdet = self.params.logdet[trial.y.shape[0]]
-
-        fa = FactorAnalysis(n_components=self.params.n_factors)
-        y = jnp.row_stack([trial.y for trial in self.session])
-        fa = fa.fit(y)
-        for trial in self.session:
-            trial.z = jnp.asarray(fa.transform(trial.y))
-            assert trial.z.shape[0] == (trial.y.shape[0])
-            trial.v = jnp.tile(self.params.scale, (trial.z.shape[0], 1))
-            trial.w = jnp.ones_like(trial.z)
+        # init trials
+        click.echo('Initializing')
+        preprocess(self.session, self.params, initialize=fa.transform)
+        preprocess(self.em_session, self.params, initialize=fa.transform)
 
     def fit(self, *, max_iter: int = 20, tol: float = 1e-7):
+        click.echo('EM starting')
         loss = jnp.inf
         for i in range(max_iter):
             tick = time.perf_counter()
-            m_loss = mstep(self)
+            m_loss = mstep(self.em_session, self.params)
             tock = time.perf_counter()
             m_elapsed = tock - tick
 
             tick = time.perf_counter()
-            e_loss = estep(self)
+            e_loss = estep(self.em_session, self.params)
             tock = time.perf_counter()
             e_elapsed = tock - tick
 
             click.echo(
-                f'Iteration {i + 1},\tLoss = {e_loss.item():.2f},\t'
+                f'EM Iteration {i + 1},\tLoss = {e_loss.item():.2f},\t'
                 f'M step: {m_elapsed:.2f}s,\t'
                 f'E step: {e_elapsed:.2f}s'
             )
 
             if jnp.isnan(e_loss):
-                click.echo('Stopped at NaN loss.')
+                click.echo('EM stopped at NaN loss.')
                 break
             if jnp.isclose(loss, e_loss):
-                click.echo('Stopped at unchanged loss.')
+                click.echo('EM stopped at unchanged loss.')
                 break
             if e_loss > loss:
-                click.echo('Stopped at increased loss.')
+                click.echo('EM stopped at increased loss.')
                 break
 
             loss = e_loss
+
+        click.echo('Inferring')
+        estep(self.session, self.params)
+        click.echo('Finished')
+
         return self
