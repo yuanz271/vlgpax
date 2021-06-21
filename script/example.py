@@ -19,7 +19,7 @@ def main():
     N = 10  # 10D
     x = np.column_stack([z, np.ones(T)])  # Append a constant column for bias
     C = np.random.randn(x.shape[-1], N)  # Sample the loading matrix from Gaussian
-    C[-1, :] = -1.  # change the bias
+    C[-1, :] = -1.5  # less spikes per bin
     r = np.exp(x @ C)  # firing rate
     y = np.random.poisson(r)  # spikes
 
@@ -53,7 +53,12 @@ def main():
     # Session supports direct access to the fields of trial. It concatenate the requested field of all the trials.
 
     model.fit(max_iter=50)  # Do the job
-    # NOTE: fit will modify session
+    # After fitting, the following fields will be filled in each trial
+    # z: psoterior mean of latent factors, (T, factor)
+    # v: posterior variance of latent factors, (T, factor)
+    # w: needed to construct posterior covariance
+    # Note that the fit doesn't keep posterior covariance of each factor
+    # to save space, but they can be reconstructed.
 
     ax[4].plot(session.z)  # Draw the result
     plt.show()
