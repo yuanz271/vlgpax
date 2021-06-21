@@ -21,7 +21,6 @@
 # K: Array(M, T, T), prior kernel matrices, reference to some irredundant storage
 # L: Array(M, T, S), K ~= LL'
 ######################
-import math
 import time
 from collections import Iterable
 from typing import Union, Sequence, Tuple, Any, Callable
@@ -179,7 +178,7 @@ class Inference:
     def __init__(self, session: Session,
                  n_factors: int,
                  kernel: Union[Callable, Sequence[Callable]], *,
-                 T_em):
+                 T_em=100):
         self.session = session
         self.params = Params(n_factors)
         self.params.T_em = T_em

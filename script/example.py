@@ -42,11 +42,8 @@ def main():
     # and etc. It will be a column vector of all ones automatically if not given.
 
     # %% Build the model
-    lengthscale = 100 * dt
-    T_em = math.floor(lengthscale / session.binsize)
     model = Inference(session, n_factors=2,
-                      kernel=RBF(scale=1., lengthscale=lengthscale),
-                      T_em=T_em)
+                      kernel=RBF(scale=1., lengthscale=100 * dt))
     # Inference requires the target `session`, the number of factors `n_factors`, and the `kernel` function.
     # `kernel` is typically a kernel function. It can be a `callable` or a list of `callable`s. When it is a list,
     # it should contain the kernel functions corresponding to the factors.
