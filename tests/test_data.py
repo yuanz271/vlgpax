@@ -2,7 +2,7 @@ import jax
 from jax import numpy as jnp
 import pytest
 
-from vlgp.data import Experiment, Trial
+from vlgp.data import Session, Trial
 from vlgp.vi import Inference
 
 
@@ -24,7 +24,7 @@ def test_trial():
 
 def test_experiment():
     T, N = 100, 10
-    expt = Experiment(1, 'sec')
+    expt = Session(1, 'sec')
 
     assert isinstance(expt.trials, list)
     assert not expt.trials
@@ -40,7 +40,7 @@ def test_experiment():
 def test_inference():
     T, N = 100, 10
     n_factors = 2
-    expt = Experiment(1, 'sec')
+    expt = Session(1, 'sec')
     expt.add_trial(Trial(1, jnp.zeros((T, N))))
     expt.add_trial(Trial(2, jnp.zeros((T, N))))
 

@@ -51,7 +51,8 @@ class Trial:
 
 
 @dataclass
-class Experiment:
+class Session:
+    """A trial container with some properties shared by trials"""
     binsize: float
     unit: str
     trials: List[Trial] = field(default_factory=list, repr=False)
@@ -65,3 +66,23 @@ class Experiment:
 
     def __iter__(self):
         return iter(self.trials)
+
+    @property
+    def y(self):
+        return jnp.row_stack([trial.y for trial in self.trials])
+
+    @property
+    def x(self):
+        return jnp.row_stack([trial.x for trial in self.trials])
+
+    @property
+    def z(self):
+        return jnp.row_stack([trial.z for trial in self.trials])
+
+    @property
+    def v(self):
+        return jnp.row_stack([trial.v for trial in self.trials])
+
+    @property
+    def w(self):
+        return jnp.row_stack([trial.w for trial in self.trials])
