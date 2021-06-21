@@ -5,6 +5,7 @@ import jax
 from jax import numpy as jnp
 from jax import vmap
 
+__all__ = ['RBF', 'RFF']
 PRNGKey = Any
 Array = Any
 

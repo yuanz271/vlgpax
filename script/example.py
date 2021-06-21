@@ -4,7 +4,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 from vlgp.data import Trial, Session
-from vlgp.gp.kernel import RBF
+from vlgp.kernel import RBF
 from vlgp.vi import Inference
 
 

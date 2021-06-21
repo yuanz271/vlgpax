@@ -3,6 +3,8 @@ from typing import Any, Union, Optional, Sequence, List
 
 from jax import numpy as jnp
 
+__all__ = ['Trial', 'Session', 'Params']
+
 
 @dataclass
 class Params:

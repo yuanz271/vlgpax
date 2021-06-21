@@ -1,7 +1,7 @@
 import jax
 from jax import numpy as jnp
 
-from vlgp.gp import kernel
+from vlgp import kernel
 
 
 def test_RFF():
