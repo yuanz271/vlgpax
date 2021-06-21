@@ -198,7 +198,13 @@ class Inference:
             m_loss = mstep(self)
             e_loss = estep(self)
             click.echo(f'Iteration {i + 1}, M step: {m_loss.item():.2f}, E step: {e_loss.item():.2f}')
+
             if jnp.isclose(loss, e_loss):
+                click.echo('Stopped at unchanged loss.')
                 break
+            if e_loss > loss:
+                click.echo('Stopped at increased loss.')
+                break
+
             loss = e_loss
         return self
