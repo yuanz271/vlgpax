@@ -36,7 +36,6 @@ from .util import diag_embed, stable_solve as solve, capped_exp
 __all__ = ['Inference']
 
 
-@jax.jit
 def trial_update(y, Cx, Cz, x, z, v, w, K, logdet, eps):
     T = y.shape[0]
     u = v @ (Cz ** 2)
@@ -102,8 +101,6 @@ def estep(infer, *, max_iter: int = 20, stepsize=0.9, eps: float = 1e-8):
 
             loss = new_loss
             newton_step *= stepsize
-            if jnp.any(jnp.isnan(newton_step)) or jnp.any(jnp.isinf(newton_step)):
-                continue
             z -= newton_step
 
         trial.z = z
