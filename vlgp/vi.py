@@ -150,10 +150,13 @@ def mstep(session, params, *, max_iter: int = 20, stepsize=.5):
 def preprocess(session, params, initialize):
     for trial in session:
         T = trial.y.shape[0]
-        trial.z = jnp.asarray(initialize(trial.y))
+        if trial.z is None:
+            trial.z = jnp.asarray(initialize(trial.y))
         assert trial.z.shape[0] == T
-        trial.v = jnp.tile(params.scale, (T, 1))
-        trial.w = jnp.ones_like(trial.z)
+        if trial.v is None:
+            trial.v = jnp.ones_like(trial.z)
+        if trial.w is None:
+            trial.w = jnp.ones_like(trial.z)
         trial.K = params.K[T]
         trial.L = params.L[T]
         trial.logdet = params.logdet[T]
