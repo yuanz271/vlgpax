@@ -9,19 +9,11 @@ __all__ = ['Trial', 'Session', 'Params']
 @dataclass
 class Params:
     n_factors: int
-    scale: Union[float, Sequence[float]] = 1.
-    lengthscale: Union[float, Sequence[float]] = 1.
     C: Optional[Any] = None  # (n_factors + n_regressors, n_channels)
     K: Optional[Any] = None  # (n_factors, T, T)
     L: Optional[Any] = None  # (n_factors, T, T)
     logdet: Optional[Any] = None  # (n_factors, T)
-
-    def __post_init__(self):
-        self.scale = jnp.asarray(self.scale)
-        self.scale = jnp.full(self.n_factors, fill_value=self.scale)
-
-        self.lengthscale = jnp.asarray(self.lengthscale)
-        self.lengthscale = jnp.full(self.n_factors, fill_value=self.lengthscale)
+    T_em: int = None
 
 
 @dataclass

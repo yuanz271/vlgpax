@@ -176,10 +176,10 @@ class Inference:
     def __init__(self, session: Session,
                  n_factors: int,
                  kernel: Union[Callable, Sequence[Callable]], *,
-                 scale: Union[float, Sequence[float]] = 1.,
-                 lengthscale: Union[float, Sequence[float]] = 1.):
+                 T_em):
         self.session = session
-        self.params = Params(n_factors, scale, lengthscale)
+        self.params = Params(n_factors)
+        self.params.T_em = T_em
         self.kernel = kernel
         self.em_session = None  # for quick EM
         self.init()
@@ -195,13 +195,12 @@ class Inference:
         y = self.session.y
         fa = fa.fit(y)
 
-        T_em = math.floor(max(self.params.lengthscale) / self.session.binsize)
-        self.em_session = make_em_session(self.session, T_em)
+        self.em_session = make_em_session(self.session, self.params.T_em)
 
         # init params
         self.params.C = jnp.zeros((n_factors + n_regressors, n_channels))
         Ts = [trial.y.shape[0] for trial in self.session]
-        Ts.append(T_em)
+        Ts.append(self.params.T_em)
         unique_Ts = jnp.unique(Ts)
         ks = self.kernel if isinstance(self.kernel, Iterable) else [self.kernel] * n_factors
         self.params.K = {
