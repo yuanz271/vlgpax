@@ -1,8 +1,11 @@
+import math
+
 import jax
 from jax import numpy as jnp
 import pytest
 
 from vlgp.data import Session, Trial
+from vlgp.kernel import RBF
 from vlgp.vi import Inference
 
 
@@ -33,9 +36,6 @@ def test_experiment():
     with pytest.raises(AssertionError):
         expt.add_trial(Trial(2, jnp.zeros((T, N + 1))))
 
-    for trial in expt:
-        print(trial)
-
 
 def test_inference():
     T, N = 100, 10
@@ -43,11 +43,9 @@ def test_inference():
     expt = Session(1, 'sec')
     expt.add_trial(Trial(1, jnp.zeros((T, N))))
     expt.add_trial(Trial(2, jnp.zeros((T, N))))
-
-    inference = Inference(expt, n_factors, scale=1., lengthscale=1.)
+    lengthscale = 10.
+    T_em = math.floor(lengthscale / expt.binsize)
+    inference = Inference(expt, n_factors, kernel=RBF(scale=1., lengthscale=lengthscale),
+                          T_em=T_em)
     assert inference.params.K[T].shape == (n_factors, T, T)
     assert inference.params.C.shape == (n_factors + 1, N)
-
-    A = jnp.stack([jnp.eye(3), jnp.eye(3) * 2])
-    b = jnp.eye(3)[None, ...]
-    print(jnp.linalg.solve(A, b))

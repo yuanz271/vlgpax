@@ -19,7 +19,7 @@ def main():
     N = 10  # 10D
     x = np.column_stack([z, np.ones(T)])  # Append a constant column for bias
     C = np.random.randn(x.shape[-1], N)  # Sample the loading matrix from Gaussian
-    C[-1, :] = -1.1  # change the bias
+    C[-1, :] = -1.  # change the bias
     r = np.exp(x @ C)  # firing rate
     y = np.random.poisson(r)  # spikes
 
