@@ -98,6 +98,7 @@ def estep(session, params, *, max_iter: int = 20, stepsize=.5, eps: float = 1e-8
                 break
             loss = new_loss
 
+            newton_step = jnp.clip(newton_step, a_min=-1., a_max=1.)
             if jnp.any(jnp.isnan(newton_step)) or jnp.any(jnp.isinf(newton_step)):
                 break
             z -= stepsize * newton_step
