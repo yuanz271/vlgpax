@@ -73,7 +73,7 @@ def trial_update(y, Cx, Cz, x, z, v, w, K, logdet, eps) -> Tuple[float, Any]:
     return loss, step
 
 
-def estep(session, params, *, max_iter: int = 20, stepsize=.5, eps: float = 1e-8) -> jnp.ndarray:
+def estep(session, params, *, max_iter: int = 20, stepsize=1., eps: float = 1e-8) -> jnp.ndarray:
     zdim = params.n_factors
     C = params.C  # (zdim + xdim, ydim)
     Cz, Cx = jnp.vsplit(C, [zdim])  # (n_factors + n_regressors, n_channels)
@@ -98,7 +98,7 @@ def estep(session, params, *, max_iter: int = 20, stepsize=.5, eps: float = 1e-8
                 break
             loss = new_loss
 
-            newton_step = jnp.clip(newton_step, a_min=-1., a_max=1.)
+            newton_step = jnp.clip(newton_step, a_min=-stepsize, a_max=stepsize)
             if jnp.any(jnp.isnan(newton_step)) or jnp.any(jnp.isinf(newton_step)):
                 break
             z -= stepsize * newton_step
@@ -111,7 +111,7 @@ def estep(session, params, *, max_iter: int = 20, stepsize=.5, eps: float = 1e-8
     return total_loss / total_T
 
 
-def mstep(session, params, *, max_iter: int = 20, stepsize=.5):
+def mstep(session, params, *, max_iter: int = 20, stepsize=1.):
     zdim = params.n_factors
     C = params.C  # (zdim + xdim, ydim)
 

@@ -23,21 +23,21 @@ pip install git+https://github.com/catniplab/vlgp.git
 Try the [example](script/example.py).
 
 ### Data structure
-- `Trial`
+- `Trial` A single trial
   - `y` spike train
   - `x` regressors
   - `z` latent factors
   - `v` posterior variances
   - `w` diagonals of W matrices  
-- `Session`
+- `Session` A container of trials
   - `trials` list of `Trial`s
   - `binsize` 
   - `unit` *str*, unit of time
-- `Params`
+- `Params` Parameters
   - `n_factors` number of latent factors
   - `K` kernel matrices
   - `logdet` log determinant of `K`s  
-- `Inference`
+- `Inference` Wrapper of algorithm
   - `session`
   - `params`
   - `kernel` kernel functions
