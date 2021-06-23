@@ -1,7 +1,7 @@
 import warnings
 
 import jax
-from jax import numpy as jnp
+from jax import lax, numpy as jnp
 
 
 diag_embed = jax.jit(jax.vmap(jnp.diag))
@@ -25,3 +25,18 @@ def stable_solve(a, b):
 @jax.jit
 def capped_exp(x, c: float = 10.):
     return jnp.exp(jnp.clip(x, a_max=c))
+
+
+@jax.jit
+def cholesky_solve(L, b):
+    """
+    :param L: Cholesky factor, always lower triangular
+    :param b:
+    :return:
+    """
+    lower = True
+    b = lax.linalg.triangular_solve(L, b, left_side=True, lower=lower,
+                                    transpose_a=not lower, conjugate_a=not lower)
+    b = lax.linalg.triangular_solve(L, b, left_side=True, lower=lower,
+                                    transpose_a=lower, conjugate_a=lower)
+    return b
