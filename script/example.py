@@ -7,6 +7,10 @@ from vlgp.data import Trial, Session
 from vlgp.kernel import RBF
 from vlgp.vi import Inference
 
+from jax.config import config
+
+config.update('jax_enable_x64', True)
+
 
 def main():
     # %% Generate 2D sine wave latent trajectory
@@ -52,7 +56,7 @@ def main():
     ax[3].plot(session.z)  # Draw the initial factors
     # Session supports direct access to the fields of trial. It concatenate the requested field of all the trials.
 
-    model.fit(max_iter=50)  # Do the job
+    model.fit(max_iter=100)  # Do the job
     # After fitting, the following fields will be filled in each trial
     # z: psoterior mean of latent factors, (T, factor)
     # v: posterior variance of latent factors, (T, factor)
