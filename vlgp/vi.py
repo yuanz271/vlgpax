@@ -25,7 +25,7 @@ import time
 from collections import Iterable
 from typing import Union, Sequence, Tuple, Any, Callable
 
-import click
+import typer
 from jax import numpy as jnp
 from sklearn.decomposition import FactorAnalysis
 
@@ -219,12 +219,12 @@ class Inference:
         }
 
         # init trials
-        click.echo('Initializing')
+        typer.echo('Initializing')
         preprocess(self.session, self.params, initialize=fa.transform)
         preprocess(self.em_session, self.params, initialize=fa.transform)
 
     def fit(self, *, max_iter: int = 20, tol: float = 1e-7):
-        click.echo('EM starting')
+        typer.echo('EM starting')
         loss = jnp.inf
         for i in range(max_iter):
             tick = time.perf_counter()
@@ -237,26 +237,26 @@ class Inference:
             tock = time.perf_counter()
             e_elapsed = tock - tick
 
-            click.echo(
+            typer.echo(
                 f'EM Iteration {i + 1},\tLoss = {e_loss.item():.2f},\t'
                 f'M step: {m_elapsed:.2f}s,\t'
                 f'E step: {e_elapsed:.2f}s'
             )
 
             if jnp.isnan(e_loss):
-                click.echo('EM stopped at NaN loss.')
+                typer.echo('EM stopped at NaN loss.')
                 break
             if jnp.isclose(loss, e_loss):
-                click.echo('EM stopped at unchanged loss.')
+                typer.echo('EM stopped at unchanged loss.')
                 break
             if e_loss > loss:
-                click.echo('EM stopped at increased loss.')
+                typer.echo('EM stopped at increased loss.')
                 break
 
             loss = e_loss
 
-        click.echo('Inferring')
+        typer.echo('Inferring')
         estep(self.session, self.params)
-        click.echo('Finished')
+        typer.echo('Finished')
 
         return self
