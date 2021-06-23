@@ -11,7 +11,7 @@ setup(
     author_email="yuanz271@gmail.com",
     description="variational Latent Gaussian Process",
     python_requires=">=3.8.0",
-    install_requires=["jax", "jaxlib", "scikit-learn", "click"],
+    install_requires=["jax", "jaxlib", "scikit-learn", "typer"],
     classifiers=[
         # Trove classifiers
         # Full list: https://pypi.python.org/pypi?%3Aaction=list_classifiers

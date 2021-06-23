@@ -36,7 +36,6 @@ __all__ = ['Inference']
 
 
 def trial_update(y, Cx, Cz, x, z, v, w, K, logdet, eps) -> Tuple[float, Any]:
-    T = y.shape[0]
     u = v @ (Cz ** 2)
     lnr = x @ Cx + z @ Cz
     r = capped_exp(lnr + 0.5 * u)  # [x, z] C
@@ -56,9 +55,7 @@ def trial_update(y, Cx, Cz, x, z, v, w, K, logdet, eps) -> Tuple[float, Any]:
                        jnp.squeeze(jnp.transpose(z3d, (0, 2, 1)) @ K_div_z, -1) +
                        jnp.trace(jnp.linalg.solve(K, V), axis1=-2, axis2=-1))
     lq = -0.5 * jnp.sum(jnp.log(jnp.linalg.cholesky(V).diagonal(axis1=-2, axis2=-1)).sum(-1) * 2)
-    # l2 = jnp.sum((jnp.sum(z ** 2, 0) - T) ** 2)
-    l2 = 0.
-    loss = (ll + lp + lq + l2) / T
+    loss = ll + lp + lq
 
     # Newton step
     g = K_div_z - jnp.expand_dims(Cz @ (y - r).T, -1)  # (zdim, T, T) (zdim, T, 1)
@@ -106,7 +103,7 @@ def estep(session, params, *, max_iter: int = 20, stepsize=1., eps: float = 1e-8
         trial.z = z
         trial.w = w
         total_T += T
-        total_loss += loss * T
+        total_loss += loss
 
     return total_loss / total_T
 
@@ -228,35 +225,35 @@ class Inference:
         loss = jnp.inf
         for i in range(max_iter):
             tick = time.perf_counter()
-            m_loss = mstep(self.em_session, self.params)
+            mstep(self.em_session, self.params)
             tock = time.perf_counter()
             m_elapsed = tock - tick
 
             tick = time.perf_counter()
-            e_loss = estep(self.em_session, self.params)
+            new_loss = estep(self.em_session, self.params)
             tock = time.perf_counter()
             e_elapsed = tock - tick
 
             typer.echo(
-                f'EM Iteration {i + 1},\tLoss = {e_loss.item():.2f},\t'
+                f'EM Iteration {i + 1},\tLoss = {new_loss.item():.2f},\t'
                 f'M step: {m_elapsed:.2f}s,\t'
                 f'E step: {e_elapsed:.2f}s'
             )
 
-            if jnp.isnan(e_loss):
-                typer.echo('EM stopped at NaN loss.')
+            if jnp.isnan(new_loss):
+                typer.echo(typer.style('EM stopped at NaN loss.', fg=typer.colors.WHITE, bg=typer.colors.RED))
                 break
-            if jnp.isclose(loss, e_loss):
+            if jnp.isclose(loss, new_loss):
                 typer.echo('EM stopped at unchanged loss.')
                 break
-            if e_loss > loss:
-                typer.echo('EM stopped at increased loss.')
-                break
+            # if new_loss > loss:
+            #     typer.echo('EM stopped at increased loss.')
+            #     break
 
-            loss = e_loss
+            loss = new_loss
 
         typer.echo('Inferring')
         estep(self.session, self.params)
-        typer.echo('Finished')
+        typer.echo(typer.style('Finished', fg=typer.colors.GREEN, bold=True))
 
         return self
