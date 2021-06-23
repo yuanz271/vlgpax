@@ -36,7 +36,7 @@ __all__ = ['Inference']
 
 
 def reconstruct_cov(K, w, eps=1e-7):
-    invw = 1. / (w + eps)
+    invw = 1. / w
     assert jnp.all(invw > 0.)
     invW = diag_embed(invw.T)  # (zdim, T, T)
     # assert jnp.array_equal(invW.diagonal(axis1=-2, axis2=-1), invw.T)
