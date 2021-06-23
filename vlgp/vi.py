@@ -128,6 +128,9 @@ def estep(session, params, *, max_iter: int = 20, stepsize=1., eps: float = 1e-7
         trial.w = w
         total_T += T
         total_loss += loss
+        if verbose:
+            typer.echo(f'Trial {trial.tid}, '
+                       f'\tLoss = {loss.item() / trial.y.shape[0]:.2f}')
 
     return total_loss / total_T
 
