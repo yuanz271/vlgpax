@@ -23,7 +23,7 @@
 ######################
 import time
 from collections import Iterable
-from typing import Union, Sequence, Tuple, Any, Callable
+from typing import Union, Sequence, Callable
 
 import typer
 from jax import lax, numpy as jnp
@@ -33,6 +33,7 @@ from .data import Session, Params, Trial
 from .util import diag_embed, stable_solve as solve, capped_exp, cholesky_solve
 
 __all__ = ['Inference']
+default_clip = 3.
 
 
 def reconstruct_cov(K, w, eps=1e-7):
@@ -73,7 +74,7 @@ def single_trial_step(y, Cx, Cz, x, z, v, K, L, logdet, eps):
     # V = V + Vd  # make sure V is PD
     V = reconstruct_cov(K, w, eps)
     v = V.diagonal(axis1=-2, axis2=-1).T
-    assert jnp.all(V.diagonal(axis1=-2, axis2=-1) > 0.)
+    assert jnp.all(v > 0.)
     # assert not jnp.any(jnp.isnan(V))
     ll = jnp.sum(r - y * lnr)  # likelihood
     lp = 0.5 * jnp.sum(logdet +
@@ -90,13 +91,15 @@ def single_trial_step(y, Cx, Cz, x, z, v, K, L, logdet, eps):
     return loss, step, v, w
 
 
-def estep(session, params, *, max_iter: int = 20, stepsize=1., eps: float = 1e-7, clip=1.) -> jnp.ndarray:
+def estep(session, params, *,
+          max_iter: int = 50, stepsize=1., clip=default_clip,
+          eps: float = 1e-7,
+          verbose: bool = False) -> jnp.ndarray:
     zdim = params.n_factors
     C = params.C  # (zdim + xdim, ydim)
     Cz, Cx = jnp.vsplit(C, [zdim])  # (n_factors + n_regressors, n_channels)
 
-    total_loss: jnp.ndarray = jnp.array(0.)
-    total_T = 0
+    session_loss = 0.
     for trial in session:  # parallelizable
         x = trial.x  # regressors
         z = trial.z
@@ -107,7 +110,6 @@ def estep(session, params, *, max_iter: int = 20, stepsize=1., eps: float = 1e-7
         L = trial.L
         logdet = trial.logdet
 
-        T = y.shape[0]
         loss = jnp.inf
         for i in range(max_iter):
             new_loss, newton_step, v, w = single_trial_step(y, Cx, Cz, x, z, v, K, L, logdet, eps)
@@ -116,8 +118,8 @@ def estep(session, params, *, max_iter: int = 20, stepsize=1., eps: float = 1e-7
                 break
             loss = new_loss
 
-            if jnp.any(jnp.abs(newton_step) > 5.):
-                typer.echo(f'E: large update detected')
+            if jnp.any(jnp.abs(newton_step) > clip):
+                typer.echo(f'E: large update detected', err=True)
             newton_step = jnp.clip(newton_step, a_min=-clip, a_max=clip)
             if jnp.any(jnp.isnan(newton_step)) or jnp.any(jnp.isinf(newton_step)):
                 break
@@ -126,16 +128,15 @@ def estep(session, params, *, max_iter: int = 20, stepsize=1., eps: float = 1e-7
         trial.z = z
         trial.v = v
         trial.w = w
-        total_T += T
-        total_loss += loss
+        session_loss += loss
         if verbose:
             typer.echo(f'Trial {trial.tid}, '
                        f'\tLoss = {loss.item() / trial.y.shape[0]:.2f}')
 
-    return total_loss / total_T
+    return session_loss / session.T
 
 
-def mstep(session, params, *, max_iter: int = 20, stepsize=1., clip=1.):
+def mstep(session, params, *, max_iter: int = 50, stepsize=1., clip=default_clip):
     zdim = params.n_factors
     C = params.C  # (zdim + xdim, ydim)
 
@@ -166,8 +167,8 @@ def mstep(session, params, *, max_iter: int = 20, stepsize=1., clip=1.):
         H = jnp.expand_dims(M.T, 0) @ R @ jnp.expand_dims(M, 0)  # (ydim, zdim + xdim, zdim + xdim)
         assert jnp.all(H.diagonal(axis1=-2, axis2=-1) > 0.)
         newton_step = jnp.squeeze(solve(H, jnp.expand_dims(g, -1)), -1).T  # (ydim, ?, 1)
-        if jnp.any(jnp.abs(newton_step) > 5.):
-            typer.echo(f'M: large update detected')
+        if jnp.any(jnp.abs(newton_step) > clip):
+            typer.echo(f'M: large update detected', err=True)
         newton_step = jnp.clip(newton_step, a_min=-clip, a_max=clip)
         C = C - stepsize * newton_step
 
@@ -252,7 +253,7 @@ class Inference:
         preprocess(self.em_session, self.params, initialize=fa.transform)
         typer.secho('Initialized', fg=typer.colors.GREEN, bold=True)
 
-    def fit(self, *, max_iter: int = 20):
+    def fit(self, *, max_iter: int = 50):
         loss = jnp.inf
 
         try:
@@ -268,19 +269,19 @@ class Inference:
                 e_elapsed = tock - tick
 
                 typer.echo(
-                    f'EM Iteration {i + 1},\tLoss = {new_loss.item():.2f},\t'
-                    f'M step: {m_elapsed:.2f}s,\t'
+                    f'EM Iteration {i + 1}, \tLoss = {new_loss.item():.2f}, \t'
+                    f'M step: {m_elapsed:.2f}s, \t'
                     f'E step: {e_elapsed:.2f}s'
                 )
 
                 if jnp.isnan(new_loss):
-                    typer.secho('EM stopped at NaN loss.', fg=typer.colors.WHITE, bg=typer.colors.RED)
+                    typer.secho('EM stopped at NaN loss.', fg=typer.colors.WHITE, bg=typer.colors.RED, err=True)
                     break
                 if jnp.isclose(loss, new_loss):
-                    typer.echo('EM stopped at unchanged loss.')
+                    typer.echo('EM stopped at convergence.')
                     break
                 if new_loss > loss:
-                    typer.echo('EM stopped at increased loss.')
+                    typer.echo('EM stopped at increasing loss.')
                     break
 
                 loss = new_loss
@@ -288,7 +289,7 @@ class Inference:
             typer.echo('Aborted')
 
         typer.echo('Inferring')
-        estep(self.session, self.params)
+        estep(self.session, self.params, verbose=True)
         typer.secho('Finished', fg=typer.colors.GREEN, bold=True)
 
         return self
