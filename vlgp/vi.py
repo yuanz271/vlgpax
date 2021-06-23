@@ -274,6 +274,37 @@ class Inference:
             #     break
 
             loss = new_loss
+        try:
+            for i in range(max_iter):
+                tick = time.perf_counter()
+                mstep(self.em_session, self.params)
+                tock = time.perf_counter()
+                m_elapsed = tock - tick
+
+                tick = time.perf_counter()
+                new_loss = estep(self.em_session, self.params)
+                tock = time.perf_counter()
+                e_elapsed = tock - tick
+
+                typer.echo(
+                    f'EM Iteration {i + 1},\tLoss = {new_loss.item():.2f},\t'
+                    f'M step: {m_elapsed:.2f}s,\t'
+                    f'E step: {e_elapsed:.2f}s'
+                )
+
+                if jnp.isnan(new_loss):
+                    typer.secho('EM stopped at NaN loss.', fg=typer.colors.WHITE, bg=typer.colors.RED)
+                    break
+                if jnp.isclose(loss, new_loss):
+                    typer.echo('EM stopped at unchanged loss.')
+                    break
+                if new_loss > loss:
+                    typer.echo('EM stopped at increased loss.')
+                    break
+
+                loss = new_loss
+        except KeyboardInterrupt:
+            typer.echo('Aborted')
 
         typer.echo('Inferring')
         estep(self.session, self.params)
