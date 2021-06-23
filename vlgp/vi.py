@@ -44,8 +44,8 @@ def reconstruct_cov(K, w, eps=1e-7):
     G = jnp.linalg.cholesky(invW + K)
     K_div_G = lax.linalg.triangular_solve(G, K, left_side=True, lower=True)
     V = K - jnp.transpose(K_div_G, (0, 2, 1)) @ K_div_G  # (zdim, T, T)
-    Vd = diag_embed(jnp.clip(V.diagonal(axis1=-2, axis2=-1), a_max=0.) + eps)
-    V = V + Vd  # make sure V is PD
+    Vd = diag_embed(jnp.clip(V.diagonal(axis1=-2, axis2=-1), a_max=0.) - eps)
+    V = V - Vd  # make sure V is PD
     return V
 
 
