@@ -113,6 +113,7 @@ def estep(session, params, *, max_iter: int = 20, stepsize=1., eps: float = 1e-8
         loss = jnp.inf
         for i in range(max_iter):
             new_loss, newton_step = trial_update(y, Cx, Cz, x, z, v, w, K, logdet, eps)
+            new_loss, newton_step, v, w = single_trial_step(y, Cx, Cz, x, z, v, K, L, logdet, eps)
 
             if jnp.isclose(loss, new_loss):
                 break
@@ -124,6 +125,7 @@ def estep(session, params, *, max_iter: int = 20, stepsize=1., eps: float = 1e-8
             z -= stepsize * newton_step
 
         trial.z = z
+        trial.v = v
         trial.w = w
         total_T += T
         total_loss += loss
