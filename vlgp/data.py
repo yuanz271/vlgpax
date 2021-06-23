@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Union, Optional, Sequence, List
+from typing import Any, Optional, List
 
 from jax import numpy as jnp
 
@@ -53,10 +53,12 @@ class Session:
     binsize: float
     unit: str
     trials: List[Trial] = field(default_factory=list, repr=False)
+    T: Optional[int] = 0
 
     def add_trial(self, trial: Trial):
         if not self.trials:
             self.trials.append(trial)
+            self.T += trial.y.shape[0]
         else:
             assert self.trials[0].is_consistent_with(trial)
             self.trials.append(trial)
