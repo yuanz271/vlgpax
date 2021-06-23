@@ -36,6 +36,18 @@ __all__ = ['Inference']
 
 
 def trial_update(y, Cx, Cz, x, z, v, w, K, logdet, eps) -> Tuple[float, Any]:
+def reconstruct_cov(K, w, eps=1e-7):
+    invw = 1. / (w + eps)
+    assert jnp.all(invw > 0.)
+    invW = diag_embed(invw.T)  # (zdim, T, T)
+    # assert jnp.array_equal(invW.diagonal(axis1=-2, axis2=-1), invw.T)
+    assert jnp.all(invW.diagonal(axis1=-2, axis2=-1) > 0.)
+    G = jnp.linalg.cholesky(invW + K)
+    K_div_G = lax.linalg.triangular_solve(G, K, left_side=True, lower=True)
+    V = K - jnp.transpose(K_div_G, (0, 2, 1)) @ K_div_G  # (zdim, T, T)
+    Vd = diag_embed(jnp.clip(V.diagonal(axis1=-2, axis2=-1), a_max=0.) + eps)
+    V = V + Vd  # make sure V is PD
+    return V
     u = v @ (Cz ** 2)
     lnr = x @ Cx + z @ Cz
     r = capped_exp(lnr + 0.5 * u)  # [x, z] C
@@ -49,6 +61,17 @@ def trial_update(y, Cx, Cz, x, z, v, w, K, logdet, eps) -> Tuple[float, Any]:
     invw = 1 / (w + eps)
     invW = diag_embed(invw.T)  # (zdim, T, T)
     V = K - K @ solve(invW + K, K)  # (zdim, T, T)
+    # invw = 1 / (w + eps)
+    # assert jnp.all(invw > 0.)
+    # invW = diag_embed(invw.T)  # (zdim, T, T)
+    # # assert jnp.array_equal(invW.diagonal(axis1=-2, axis2=-1), invw.T)
+    # assert jnp.all(invW.diagonal(axis1=-2, axis2=-1) > 0.)
+    # G = jnp.linalg.cholesky(invW + K)
+    # K_div_G = lax.linalg.triangular_solve(G, K, left_side=True, lower=True)
+    # V = K - jnp.transpose(K_div_G, (0, 2, 1)) @ K_div_G  # (zdim, T, T)
+    # Vd = diag_embed(jnp.clip(V.diagonal(axis1=-2, axis2=-1), a_max=0.) + eps)
+    # V = V + Vd  # make sure V is PD
+    V = reconstruct_cov(K, w, eps)
     # assert not jnp.any(jnp.isnan(V))
     ll = jnp.sum(r - y * lnr)  # likelihood
     lp = 0.5 * jnp.sum(logdet +
