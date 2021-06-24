@@ -19,7 +19,8 @@
 # v: Array(T, M), diagonals of V matrices (posterior covariance)
 # w: Array(T, N), diagonals of W matrices
 # K: Array(M, T, T), prior kernel matrices, reference to some irredundant storage
-# L: Array(M, T, S), K ~= LL'
+# L: Array(M, T, T), K ~= LL'
+# V: Array(M, T, T), posterior covariance
 ######################
 import time
 from collections import Iterable
@@ -27,10 +28,11 @@ from typing import Union, Sequence, Callable
 
 import typer
 from jax import lax, numpy as jnp
+from jax.numpy.linalg import solve
 from sklearn.decomposition import FactorAnalysis
 
 from .data import Session, Params, Trial
-from .util import diag_embed, stable_solve as solve, capped_exp, cholesky_solve
+from .util import diag_embed, capped_exp, cholesky_solve
 
 __all__ = ['Inference']
 default_clip = 3.
