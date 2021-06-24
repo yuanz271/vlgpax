@@ -1,5 +1,6 @@
 import warnings
 
+import numpy as np
 import jax
 from jax import lax, numpy as jnp
 
@@ -9,11 +10,11 @@ diag_embed = jax.jit(jax.vmap(jnp.diag))
 batch_lstsq = jax.jit(jax.vmap(lambda a, b: jnp.linalg.lstsq(a, b)[0]))
 
 
-# @jax.jit
+@jax.jit
 def stable_solve(a, b):
     try:
         x = jnp.linalg.solve(a, b)
-        if jnp.any(jnp.isnan(x)) or jnp.any(jnp.isinf(x)):
+        if np.any(np.isnan(x)) or np.any(np.isinf(x)):
             raise RuntimeError()
     except RuntimeError:
         warnings.warn('Fall back to least squares')
