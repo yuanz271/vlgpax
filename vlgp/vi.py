@@ -126,6 +126,8 @@ def estep(session, params, *,
             if jnp.any(jnp.isnan(newton_step)) or jnp.any(jnp.isinf(newton_step)):
                 break
             z = z - stepsize * newton_step
+        else:
+            typer.echo(f'E: maximum number of iterations reached', err=True)
 
         trial.z = z
         trial.v = v
@@ -173,6 +175,8 @@ def mstep(session, params, *, max_iter: int = 50, stepsize=1., clip=default_clip
             typer.echo(f'M: large update detected', err=True)
         newton_step = jnp.clip(newton_step, a_min=-clip, a_max=clip)
         C = C - stepsize * newton_step
+    else:
+        typer.echo(f'M: maximum number of iterations reached', err=True)
 
     params.C = C
     return loss

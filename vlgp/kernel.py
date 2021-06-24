@@ -36,19 +36,27 @@ class RBF:
 
 
 class RFF:
-    def __init__(self, key: PRNGKey, size: int, dim: int, scale: float = 1., lengthscale: float = 1.) -> None:
+    def __init__(self, key: PRNGKey, size: int, dim: int,
+                 scale: float = 1., lengthscale: float = 1., jitter=1e-5) -> None:
         self.key = key
         self.z = jnp.sqrt(2. / size)
         self.scale = scale
         self.lengthscale = lengthscale
-
+        self.jitter = jitter
         self.w = jax.random.normal(key, (dim, size)) / lengthscale
         self.b = jax.random.uniform(key, (1, size)) * 2 * math.pi
 
     def __call__(self, x: Array, y: Optional[Array] = None) -> Array:
+        J = 0.
+        if x.ndim == 1:
+            x = jnp.expand_dims(x, -1)
         zx = self.z * jnp.cos(jnp.dot(x, self.w) + self.b)
         if y is None:
             zy = zx
+            J = jnp.eye(zx.shape[0]) * self.jitter
         else:
+            if y.ndim == 1:
+                y = jnp.expand_dims(y, -1)
             zy = self.z * jnp.cos(jnp.dot(y, self.w) + self.b)
-        return self.scale * jnp.dot(zx, zy.T)
+        K = self.scale * jnp.dot(zx, zy.T) + J
+        return K

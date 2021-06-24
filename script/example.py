@@ -1,10 +1,11 @@
 import math
 
+import jax.random
 import numpy as np
 from matplotlib import pyplot as plt
 
 from vlgp.data import Trial, Session
-from vlgp.kernel import RBF
+from vlgp.kernel import RBF, RFF
 from vlgp.vi import Inference
 
 from jax.config import config
@@ -46,8 +47,11 @@ def main():
     # and etc. It will be a column vector of all ones automatically if not given.
 
     # %% Build the model
+    # kernel = RBF(scale=1., lengthscale=100 * dt)
+    key = jax.random.PRNGKey(0)
+    kernel = RFF(key, 50, 1, scale=1., lengthscale=100 * dt)
     model = Inference(session, n_factors=2,
-                      kernel=RBF(scale=1., lengthscale=100 * dt))
+                      kernel=kernel)
     # Inference requires the target `session`, the number of factors `n_factors`, and the `kernel` function.
     # `kernel` is typically a kernel function. It can be a `callable` or a list of `callable`s. When it is a list,
     # it should contain the kernel functions corresponding to the factors.
