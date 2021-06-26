@@ -7,7 +7,7 @@
 # N: int, number of observation channels (neuron, LFP, ...)
 # M: int, number of factors
 # P: int, number of regressors
-# C: Array(N, M + P), loading matrix [Cf, Cr]
+# C: Array(M + P, N), loading matrix [Cf, Cr]
 # scale: Array(M,), factor scales
 # lengthscale: Array(M,), factor lengthscales
 
@@ -19,13 +19,14 @@
 # v: Array(T, M), diagonals of V matrices (posterior covariance)
 # w: Array(T, N), diagonals of W matrices
 # K: Array(M, T, T), prior kernel matrices, reference to some irredundant storage
-# L: Array(M, T, T), K ~= LL'
+# L: Array(M, T, T), K = LL'
 # V: Array(M, T, T), posterior covariance
 ######################
 import time
 from collections import Iterable
 from typing import Union, Sequence, Callable
 
+import numpy as np
 import typer
 from jax import lax, numpy as jnp
 from jax.numpy.linalg import solve
@@ -34,7 +35,7 @@ from sklearn.decomposition import FactorAnalysis
 from .data import Session, Params, Trial
 from .util import diag_embed, capped_exp, cholesky_solve
 
-__all__ = ['Inference']
+__all__ = ['vLGP']
 default_clip = 3.
 
 
@@ -42,7 +43,6 @@ def reconstruct_cov(K, w, eps=1e-7):
     invw = 1. / w
     assert jnp.all(invw > 0.)
     invW = diag_embed(invw.T)  # (zdim, T, T)
-    # assert jnp.array_equal(invW.diagonal(axis1=-2, axis2=-1), invw.T)
     assert jnp.all(invW.diagonal(axis1=-2, axis2=-1) > 0.)
     G = jnp.linalg.cholesky(invW + K)
     K_div_G = lax.linalg.triangular_solve(G, K, left_side=True, lower=True)
@@ -58,26 +58,11 @@ def single_trial_step(y, Cx, Cz, x, z, v, K, L, logdet, eps):
     r = capped_exp(lnr + 0.5 * u)  # [x, z] C
     # assert not jnp.any(jnp.isnan(r))
     w = r @ (Cz.T ** 2)
-    assert jnp.all(w > 0.)
-    # assert not jnp.any(jnp.isnan(w))
     z3d = jnp.expand_dims(z.T, -1)
     z_div_K = cholesky_solve(L, z3d)
-    # assert not jnp.any(jnp.isnan(z_div_K))
 
-    # invw = 1 / (w + eps)
-    # assert jnp.all(invw > 0.)
-    # invW = diag_embed(invw.T)  # (zdim, T, T)
-    # # assert jnp.array_equal(invW.diagonal(axis1=-2, axis2=-1), invw.T)
-    # assert jnp.all(invW.diagonal(axis1=-2, axis2=-1) > 0.)
-    # G = jnp.linalg.cholesky(invW + K)
-    # K_div_G = lax.linalg.triangular_solve(G, K, left_side=True, lower=True)
-    # V = K - jnp.transpose(K_div_G, (0, 2, 1)) @ K_div_G  # (zdim, T, T)
-    # Vd = diag_embed(jnp.clip(V.diagonal(axis1=-2, axis2=-1), a_max=0.) + eps)
-    # V = V + Vd  # make sure V is PD
     V = reconstruct_cov(K, w, eps)
     v = V.diagonal(axis1=-2, axis2=-1).T
-    assert jnp.all(v > 0.)
-    # assert not jnp.any(jnp.isnan(V))
     ll = jnp.sum(r - y * lnr)  # likelihood
     lp = 0.5 * jnp.sum(logdet +
                        jnp.squeeze(jnp.transpose(z3d, (0, 2, 1)) @ z_div_K, -1) +
@@ -102,7 +87,7 @@ def estep(session, params, *,
     Cz, Cx = jnp.vsplit(C, [zdim])  # (n_factors + n_regressors, n_channels)
 
     session_loss = 0.
-    for trial in session:  # parallelizable
+    for trial in session.trials:  # parallelizable
         x = trial.x  # regressors
         z = trial.z
         y = trial.y
@@ -183,7 +168,7 @@ def mstep(session, params, *, max_iter: int = 50, stepsize=1., clip=default_clip
 
 
 def preprocess(session, params, initialize):
-    for trial in session:
+    for trial in session.trials:
         T = trial.y.shape[0]
         if trial.z is None:
             trial.z = jnp.asarray(initialize(trial.y))
@@ -200,7 +185,7 @@ def preprocess(session, params, initialize):
 def make_em_session(session, T) -> Session:
     y = session.y
     x = session.x
-    em_session = Session(session.binsize, session.unit)
+    em_session = Session(session.binsize)
     n_trials = y.shape[0] // T
     y = y[:n_trials * T]
     x = x[:n_trials * T]
@@ -210,14 +195,14 @@ def make_em_session(session, T) -> Session:
     return em_session
 
 
-class Inference:
+class vLGP:
     def __init__(self, session: Session,
                  n_factors: int,
                  kernel: Union[Callable, Sequence[Callable]], *,
-                 T_em=100):
+                 T_split=100):
         self.session = session
         self.params = Params(n_factors)
-        self.params.T_em = T_em
+        self.params.T_split = T_split
         self.kernel = kernel
         self.em_session = None  # for quick EM
         self.init()
@@ -229,21 +214,22 @@ class Inference:
         n_regressors = trial.x.shape[-1]
         n_factors = self.params.n_factors
 
+        self.em_session = make_em_session(self.session, self.params.T_split)
+
         fa = FactorAnalysis(n_components=self.params.n_factors)
         y = self.session.y
         fa = fa.fit(y)
 
-        self.em_session = make_em_session(self.session, self.params.T_em)
-
         # init params
-        self.params.C = jnp.zeros((n_factors + n_regressors, n_channels))
-        Ts = [trial.y.shape[0] for trial in self.session]
-        Ts.append(self.params.T_em)
-        unique_Ts = jnp.unique(Ts)
+        if self.params.C is None:
+            self.params.C = jnp.zeros((n_factors + n_regressors, n_channels))
+
+        unique_Ts = np.unique([trial.T for trial in self.session.trials] + [self.params.T_split])
         ks = self.kernel if isinstance(self.kernel, Iterable) else [self.kernel] * n_factors
         self.params.K = {
             T: jnp.stack([k(jnp.arange(T * self.session.binsize, step=self.session.binsize)) for k in ks]) for T
             in unique_Ts}
+
         self.params.L = {
             T: jnp.linalg.cholesky(K)
             for T, K in self.params.K.items()

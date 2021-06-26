@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from functools import cached_property
 from typing import Any, Optional, List
 
 from jax import numpy as jnp
@@ -13,7 +14,7 @@ class Params:
     K: Optional[Any] = None  # (n_factors, T, T)
     L: Optional[Any] = None  # (n_factors, T, T)
     logdet: Optional[Any] = None  # (n_factors, T)
-    T_em: int = None
+    T_split: int = None
 
 
 @dataclass
@@ -21,25 +22,32 @@ class Trial:
     tid: Any
     y: Any = field(repr=False)
     x: Optional[Any] = field(default=None, repr=False)  # regressors
-    z: Optional[Any] = field(default=None, repr=False)  # factor posterior mean
-    v: Optional[Any] = field(default=None, repr=False)  # factor posterior variance
+    t: Optional[Any] = field(default=None, repr=False)  # timing of bins
+    z: Optional[Any] = field(default=None, repr=False)  # posterior mean
+    v: Optional[Any] = field(default=None, repr=False)  # posterior variance
     w: Optional[Any] = field(default=None, repr=False)
+    T: int = field(default=None, repr=False, init=False)
 
     def __post_init__(self):
         self.y = jnp.asarray(self.y, dtype=float)
+        self.T = self.y.shape[0]
+
         if self.x is not None:
-            assert self.y.shape[0] == self.x.shape[0]
+            assert self.T == self.x.shape[0]
         else:
-            self.x = jnp.ones((self.y.shape[0], 1))
+            self.x = jnp.ones((self.T, 1))
+
+        if self.t is not None:
+            assert self.T == self.t.shape[0]
 
         if self.z is not None:
-            assert self.y.shape[0] == self.z.shape[0]
+            assert self.T == self.z.shape[0]
 
         if self.v is not None:
-            assert self.y.shape[0] == self.v.shape[0]
+            assert self.T == self.v.shape[0]
 
         if self.w is not None:
-            assert self.y.shape[0] == self.w.shape[0]
+            assert self.T == self.w.shape[0]
 
     def is_consistent_with(self, trial):
         return self.__class__ == trial.__class__ and \
@@ -50,27 +58,30 @@ class Trial:
 @dataclass
 class Session:
     """A trial container with some properties shared by trials"""
-    binsize: float
-    unit: str
-    trials: List[Trial] = field(default_factory=list, repr=False)
-    T: Optional[int] = 0
+    binsize: Optional[float] = None
+    trials: List[Trial] = field(default_factory=list, repr=False, init=False)
+    T: Optional[int] = field(default=0, repr=False, init=False)
+    tids: List[Any] = field(default_factory=list, repr=False, init=False)
+    compact_session: Any = field(default=None, repr=False, init=False)
 
     def add_trial(self, trial: Trial):
+        if self.binsize is None and trial.t is None:
+            raise ValueError('The trial must contain field t if binsize is None')
         if not self.trials:
             self.trials.append(trial)
             self.T += trial.y.shape[0]
         else:
             assert self.trials[0].is_consistent_with(trial)
+            if trial.t is None:
+                trial.t = jnp.arange(trial.y.shape[0] * self.binsize, step=self.binsize)
             self.trials.append(trial)
+        self.tids.append(trial.tid)
 
-    def __iter__(self):
-        return iter(self.trials)
-
-    @property
+    @cached_property
     def y(self):
         return jnp.row_stack([trial.y for trial in self.trials])
 
-    @property
+    @cached_property
     def x(self):
         return jnp.row_stack([trial.x for trial in self.trials])
 
@@ -85,3 +96,6 @@ class Session:
     @property
     def w(self):
         return jnp.row_stack([trial.w for trial in self.trials])
+
+    # preallocation 3x as stack
+    # TODO: add compact representation

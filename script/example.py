@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 
 from vlgp.data import Trial, Session
 from vlgp.kernel import RBF, RFF
-from vlgp.vi import Inference
+from vlgp.vi import vLGP
 
 from jax.config import config
 
@@ -36,7 +36,7 @@ def main():
 
     # %% Setup inference
     ys = np.reshape(y, (10, T // 10, -1))  # Split the spike train into 10 trials
-    session = Session(dt, 'sec')  # Construct a session.
+    session = Session(dt)  # Construct a session.
     # Session is the top level container of data. Two arguments, binsize and unit of time, are required at construction.
     for i, y in enumerate(ys):
         session.add_trial(Trial(i + 1, y=y))  # Add trials to the session.
@@ -50,8 +50,8 @@ def main():
     # kernel = RBF(scale=1., lengthscale=100 * dt)
     key = jax.random.PRNGKey(0)
     kernel = RFF(key, 50, 1, scale=1., lengthscale=100 * dt)
-    model = Inference(session, n_factors=2,
-                      kernel=kernel)
+    model = vLGP(session, n_factors=2,
+                 kernel=kernel)
     # Inference requires the target `session`, the number of factors `n_factors`, and the `kernel` function.
     # `kernel` is typically a kernel function. It can be a `callable` or a list of `callable`s. When it is a list,
     # it should contain the kernel functions corresponding to the factors.

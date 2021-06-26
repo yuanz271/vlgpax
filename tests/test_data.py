@@ -6,7 +6,7 @@ import pytest
 
 from vlgp.data import Session, Trial
 from vlgp.kernel import RBF
-from vlgp.vi import Inference
+from vlgp.vi import vLGP
 
 
 def test_trial():
@@ -27,7 +27,7 @@ def test_trial():
 
 def test_experiment():
     T, N = 100, 10
-    expt = Session(1, 'sec')
+    expt = Session(1)
 
     assert isinstance(expt.trials, list)
     assert not expt.trials
@@ -40,12 +40,12 @@ def test_experiment():
 def test_inference():
     T, N = 100, 10
     n_factors = 2
-    expt = Session(1, 'sec')
+    expt = Session(1)
     expt.add_trial(Trial(1, jnp.zeros((T, N))))
     expt.add_trial(Trial(2, jnp.zeros((T, N))))
     lengthscale = 10.
     T_em = math.floor(lengthscale / expt.binsize)
-    inference = Inference(expt, n_factors, kernel=RBF(scale=1., lengthscale=lengthscale),
-                          T_em=T_em)
+    inference = vLGP(expt, n_factors, kernel=RBF(scale=1., lengthscale=lengthscale),
+                     T_em=T_em)
     assert inference.params.K[T].shape == (n_factors, T, T)
     assert inference.params.C.shape == (n_factors + 1, N)

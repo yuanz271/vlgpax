@@ -1,2 +1,2 @@
 from .data import Trial, Session
-from .vi import Inference
+from .vi import vLGP
