@@ -120,7 +120,7 @@ def estep(session, params, *,
         session_loss += loss
         if verbose:
             typer.echo(f'Trial {trial.tid}, '
-                       f'\tLoss = {loss.item() / trial.y.shape[0]:.2f}')
+                       f'\tLoss = {loss.item() / trial.y.shape[0]:.4f}')
 
     return session_loss / session.T
 
@@ -261,7 +261,7 @@ class vLGP:
                 e_elapsed = tock - tick
 
                 typer.echo(
-                    f'EM Iteration {i + 1}, \tLoss = {new_loss.item():.2f}, \t'
+                    f'EM Iteration {i + 1}, \tLoss = {new_loss.item():.4f}, \t'
                     f'M step: {m_elapsed:.2f}s, \t'
                     f'E step: {e_elapsed:.2f}s'
                 )

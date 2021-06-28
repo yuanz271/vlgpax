@@ -62,20 +62,19 @@ class Session:
     trials: List[Trial] = field(default_factory=list, repr=False, init=False)
     T: Optional[int] = field(default=0, repr=False, init=False)
     tids: List[Any] = field(default_factory=list, repr=False, init=False)
-    compact_session: Any = field(default=None, repr=False, init=False)
+    compact: bool = field(default=True, repr=False, init=False)
 
     def add_trial(self, trial: Trial):
-        if self.binsize is None and trial.t is None:
-            raise ValueError('The trial must contain field t if binsize is None')
-        if not self.trials:
-            self.trials.append(trial)
-            self.T += trial.y.shape[0]
-        else:
+        if self.trials:
             assert self.trials[0].is_consistent_with(trial)
-            if trial.t is None:
-                trial.t = jnp.arange(trial.y.shape[0] * self.binsize, step=self.binsize)
-            self.trials.append(trial)
+        if trial.t is None:
+            assert self.binsize is not None, 'The trial must contain field t if binsize is None'
+            trial.t = jnp.arange(trial.y.shape[0] * self.binsize, step=self.binsize)
+        else:
+            self.compact = False
+        self.trials.append(trial)
         self.tids.append(trial.tid)
+        self.T += trial.T
 
     @cached_property
     def y(self):
