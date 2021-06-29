@@ -26,6 +26,7 @@ import time
 from collections import Iterable
 from typing import Union, Sequence, Callable
 
+import jax
 import numpy as np
 import typer
 from jax import lax, numpy as jnp
@@ -39,20 +40,42 @@ __all__ = ['vLGP']
 default_clip = 3.
 
 
-def reconstruct_cov(K, w, eps=1e-7):
+@jax.jit
+def reconstruct_cov(K, w, eps=1e-6):
     invw = 1. / w
-    assert jnp.all(invw > 0.)
+    # assert jnp.all(invw > 0.)
     invW = diag_embed(invw.T)  # (zdim, T, T)
-    assert jnp.all(invW.diagonal(axis1=-2, axis2=-1) > 0.)
+    # assert jnp.all(invW.diagonal(axis1=-2, axis2=-1) > 0.)
     G = jnp.linalg.cholesky(invW + K)
     K_div_G = lax.linalg.triangular_solve(G, K, left_side=True, lower=True)
     V = K - jnp.transpose(K_div_G, (0, 2, 1)) @ K_div_G  # (zdim, T, T)
     Vd = diag_embed(jnp.clip(V.diagonal(axis1=-2, axis2=-1), a_max=0.) - eps)
     V = V - Vd  # make sure V is PD
     return V
+#
+#
+# @jax.jit
+# def nelbo(y, Cx, Cz, x, z, v, K, L, logdet, eps):
+#     u = v @ (Cz ** 2)
+#     lnr = x @ Cx + z @ Cz
+#     r = capped_exp(lnr + 0.5 * u)  # [x, z] C
+#     w = r @ (Cz.T ** 2)
+#     z3d = jnp.expand_dims(z.T, -1)
+#     z_div_K = cholesky_solve(L, z3d)
+#
+#     V = reconstruct_cov(K, w, eps)
+#     v = V.diagonal(axis1=-2, axis2=-1).T
+#     ll = jnp.sum(r - y * lnr)  # likelihood
+#     lp = 0.5 * jnp.sum(logdet +
+#                        jnp.squeeze(jnp.transpose(z3d, (0, 2, 1)) @ z_div_K, -1) +
+#                        jnp.trace(cholesky_solve(L, V), axis1=-2, axis2=-1))
+#     lq = -0.5 * jnp.sum(jnp.log(jnp.linalg.cholesky(V).diagonal(axis1=-2, axis2=-1)).sum(-1) * 2)
+#     loss = ll + lp + lq
+#     return loss, r, v, w, V, z_div_K
 
 
-def single_trial_step(y, Cx, Cz, x, z, v, K, L, logdet, eps):
+@jax.jit
+def e_loss_newton(y, Cx, Cz, x, z, v, K, L, logdet, eps):
     u = v @ (Cz ** 2)
     lnr = x @ Cx + z @ Cz
     r = capped_exp(lnr + 0.5 * u)  # [x, z] C
@@ -70,15 +93,22 @@ def single_trial_step(y, Cx, Cz, x, z, v, K, L, logdet, eps):
     loss = ll + lp + lq
 
     # Newton step
-    g = z_div_K + jnp.expand_dims(Cz @ (r - y).T, -1)  # (zdim, T, T) (zdim, T, 1)
+    g = z_div_K + jnp.expand_dims(Cz @ (r - y).T, -1)  # (zdim, T, 1)
     invH = V
-    step = jnp.squeeze(invH @ g, -1).T  # V = inv(-Hessian)
-    return loss, step, v, w
+    g_div_H = invH @ g
+    lam = jnp.sum(jnp.transpose(g, (0, 2, 1)) @ g_div_H) / np.prod(z.shape)  # g'Vg
+    delta = jnp.squeeze(g_div_H, -1).T  # V = inv(-Hessian)
+
+    return loss, delta, v, w, lam
+
+
+def invalid(delta):
+    return jnp.any(jnp.isnan(delta)) or jnp.any(jnp.isinf(delta))
 
 
 def estep(session, params, *,
           max_iter: int = 50, stepsize=1., clip=default_clip,
-          eps: float = 1e-7,
+          eps: float = 1e-6,
           verbose: bool = False) -> jnp.ndarray:
     zdim = params.n_factors
     C = params.C  # (zdim + xdim, ydim)
@@ -95,20 +125,22 @@ def estep(session, params, *,
         L = trial.L
         logdet = trial.logdet
 
-        loss = jnp.inf
+        loss = jnp.nan
         for i in range(max_iter):
-            new_loss, newton_step, v, w = single_trial_step(y, Cx, Cz, x, z, v, K, L, logdet, eps)
+            loss, delta, v, w, lam = e_loss_newton(y, Cx, Cz, x, z, v, K, L, logdet, eps)
 
-            if jnp.isclose(loss, new_loss):
+            # if jnp.isclose(loss, new_loss):
+            #     break
+            if jnp.isclose(0.5 * lam, 0.):
                 break
-            loss = new_loss
 
-            if jnp.any(jnp.abs(newton_step) > clip):
+            if jnp.any(jnp.abs(delta) > clip):
                 typer.echo(f'E: large update detected', err=True)
-            newton_step = jnp.clip(newton_step, a_min=-clip, a_max=clip)
-            if jnp.any(jnp.isnan(newton_step)) or jnp.any(jnp.isinf(newton_step)):
+            delta = jnp.clip(delta, a_min=-clip, a_max=clip)
+            if invalid(delta):
                 break
-            z = z - stepsize * newton_step
+
+            z = z - stepsize * delta
         else:
             typer.echo(f'E: maximum number of iterations reached', err=True)
 
@@ -123,6 +155,25 @@ def estep(session, params, *,
     return session_loss / session.T
 
 
+@jax.jit
+def m_loss_newton(y, C, Cz, M, v):
+    u = v @ (Cz ** 2)
+    lnr = M @ C
+    r = capped_exp(lnr + 0.5 * u)
+    loss = jnp.mean(jnp.sum(r - y * lnr, axis=-1))
+
+    R = diag_embed(r.T)  # (ydim, T, T)
+    # Newton update
+    g = (r - y).T @ M  # (ydim, zdim + xdim)
+    H = jnp.expand_dims(M.T, 0) @ R @ jnp.expand_dims(M, 0)  # (ydim, zdim + xdim, zdim + xdim)
+    # assert jnp.all(H.diagonal(axis1=-2, axis2=-1) > 0.)
+    g_div_H = solve(H, jnp.expand_dims(g, -1))
+    delta = jnp.squeeze(g_div_H, -1).T  # (ydim, ?, 1)
+    lam = jnp.sum(jnp.expand_dims(g, 1) @ g_div_H) / np.prod(M.shape)
+
+    return loss, delta, lam
+
+
 def mstep(session, params, *, max_iter: int = 50, stepsize=1., clip=default_clip):
     zdim = params.n_factors
     C = params.C  # (zdim + xdim, ydim)
@@ -134,30 +185,20 @@ def mstep(session, params, *, max_iter: int = 50, stepsize=1., clip=default_clip
     v = session.v
     M = jnp.column_stack((z, x))
 
-    loss = jnp.inf
+    loss = jnp.nan
     for i in range(max_iter):
-        Cz = C[:zdim, :]
-        u = v @ (Cz ** 2)
-        lnr = M @ C
-        r = capped_exp(lnr + 0.5 * u)
-        assert not jnp.any(jnp.isnan(r))
-        l1 = jnp.mean(jnp.sum(r - y * lnr, axis=-1))
-        new_loss = l1
+        loss, delta, lam = m_loss_newton(y, C, C[:zdim, :], M, v)
 
-        if jnp.isclose(loss, new_loss):
+        if jnp.isclose(0.5 * lam, 0.):
             break
-        loss = new_loss
 
-        R = diag_embed(r.T)  # (ydim, T, T)
-        # Newton update
-        g = (r - y).T @ M  # (ydim, zdim + xdim)
-        H = jnp.expand_dims(M.T, 0) @ R @ jnp.expand_dims(M, 0)  # (ydim, zdim + xdim, zdim + xdim)
-        assert jnp.all(H.diagonal(axis1=-2, axis2=-1) > 0.)
-        newton_step = jnp.squeeze(solve(H, jnp.expand_dims(g, -1)), -1).T  # (ydim, ?, 1)
-        if jnp.any(jnp.abs(newton_step) > clip):
+        if jnp.any(jnp.abs(delta) > clip):
             typer.echo(f'M: large update detected', err=True)
-        newton_step = jnp.clip(newton_step, a_min=-clip, a_max=clip)
-        C = C - stepsize * newton_step
+        delta = jnp.clip(delta, a_min=-clip, a_max=clip)
+        if invalid(delta):
+            break
+
+        C = C - stepsize * delta
     else:
         typer.echo(f'M: maximum number of iterations reached', err=True)
 
