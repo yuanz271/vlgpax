@@ -38,10 +38,11 @@ from .util import diag_embed, capped_exp, cholesky_solve
 
 __all__ = ['vLGP']
 default_clip = 3.
+default_eps = 1e-6
 
 
 @jax.jit
-def reconstruct_cov(K, w, eps=1e-6):
+def reconstruct_cov(K, w, eps: float = default_eps):
     invw = 1. / w
     # assert jnp.all(invw > 0.)
     invW = diag_embed(invw.T)  # (zdim, T, T)
@@ -52,30 +53,10 @@ def reconstruct_cov(K, w, eps=1e-6):
     Vd = diag_embed(jnp.clip(V.diagonal(axis1=-2, axis2=-1), a_max=0.) - eps)
     V = V - Vd  # make sure V is PD
     return V
-#
-#
-# @jax.jit
-# def nelbo(y, Cx, Cz, x, z, v, K, L, logdet, eps):
-#     u = v @ (Cz ** 2)
-#     lnr = x @ Cx + z @ Cz
-#     r = capped_exp(lnr + 0.5 * u)  # [x, z] C
-#     w = r @ (Cz.T ** 2)
-#     z3d = jnp.expand_dims(z.T, -1)
-#     z_div_K = cholesky_solve(L, z3d)
-#
-#     V = reconstruct_cov(K, w, eps)
-#     v = V.diagonal(axis1=-2, axis2=-1).T
-#     ll = jnp.sum(r - y * lnr)  # likelihood
-#     lp = 0.5 * jnp.sum(logdet +
-#                        jnp.squeeze(jnp.transpose(z3d, (0, 2, 1)) @ z_div_K, -1) +
-#                        jnp.trace(cholesky_solve(L, V), axis1=-2, axis2=-1))
-#     lq = -0.5 * jnp.sum(jnp.log(jnp.linalg.cholesky(V).diagonal(axis1=-2, axis2=-1)).sum(-1) * 2)
-#     loss = ll + lp + lq
-#     return loss, r, v, w, V, z_div_K
 
 
 @jax.jit
-def e_loss_newton(y, Cx, Cz, x, z, v, K, L, logdet, eps):
+def e_loss_newton(y, Cx, Cz, x, z, v, K, L, logdet, eps: float):
     u = v @ (Cz ** 2)
     lnr = x @ Cx + z @ Cz
     r = capped_exp(lnr + 0.5 * u)  # [x, z] C
@@ -106,10 +87,10 @@ def invalid(delta):
     return jnp.any(jnp.isnan(delta)) or jnp.any(jnp.isinf(delta))
 
 
-def estep(session, params, *,
+def estep(session: Session, params: Params, *,
           max_iter: int = 50, stepsize=1., clip=default_clip,
-          eps: float = 1e-6,
-          verbose: bool = False) -> jnp.ndarray:
+          eps: float = default_eps,
+          verbose: bool = False) -> float:
     zdim = params.n_factors
     C = params.C  # (zdim + xdim, ydim)
     Cz, Cx = jnp.vsplit(C, [zdim])  # (n_factors + n_regressors, n_channels)
@@ -125,7 +106,7 @@ def estep(session, params, *,
         L = trial.L
         logdet = trial.logdet
 
-        loss = jnp.nan
+        loss = np.nan
         for i in range(max_iter):
             loss, delta, v, w, lam = e_loss_newton(y, Cx, Cz, x, z, v, K, L, logdet, eps)
 
@@ -147,7 +128,7 @@ def estep(session, params, *,
         trial.z = z
         trial.v = v
         trial.w = w
-        session_loss += loss
+        session_loss += loss.item()
         if verbose:
             typer.echo(f'Trial {trial.tid}, '
                        f'\tLoss = {loss.item() / trial.y.shape[0]:.4f}')
@@ -174,7 +155,8 @@ def m_loss_newton(y, C, Cz, M, v):
     return loss, delta, lam
 
 
-def mstep(session, params, *, max_iter: int = 50, stepsize=1., clip=default_clip):
+def mstep(session: Session, params: Params, *,
+          max_iter: int = 50, stepsize=1., clip=default_clip):
     zdim = params.n_factors
     C = params.C  # (zdim + xdim, ydim)
 
@@ -206,7 +188,7 @@ def mstep(session, params, *, max_iter: int = 50, stepsize=1., clip=default_clip
     return loss
 
 
-def preprocess(session, params, initialize):
+def preprocess(session: Session, params: Params, initialize: Callable) -> None:
     for trial in session.trials:
         T = trial.y.shape[0]
         if trial.z is None:
@@ -221,7 +203,7 @@ def preprocess(session, params, initialize):
         trial.logdet = params.logdet[T]
 
 
-def make_em_session(session, T) -> Session:
+def make_em_session(session: Session, T: int) -> Session:
     y = session.y
     x = session.x
     em_session = Session(session.binsize)
@@ -310,7 +292,7 @@ class vLGP:
                 e_elapsed = tock - tick
 
                 typer.echo(
-                    f'EM Iteration {i + 1}, \tLoss = {new_loss.item():.4f}, \t'
+                    f'EM Iteration {i + 1}, \tLoss = {new_loss:.4f}, \t'
                     f'M step: {m_elapsed:.2f}s, \t'
                     f'E step: {e_elapsed:.2f}s'
                 )
