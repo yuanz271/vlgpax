@@ -4,7 +4,7 @@ import jax.random
 import numpy as np
 from matplotlib import pyplot as plt
 
-from vlgp.data import Trial, Session
+from vlgp.data import Session
 from vlgp.kernel import RBF, RFF
 from vlgp.vi import vLGP
 
@@ -39,7 +39,7 @@ def main():
     session = Session(dt)  # Construct a session.
     # Session is the top level container of data. Two arguments, binsize and unit of time, are required at construction.
     for i, y in enumerate(ys):
-        session.add_trial(Trial(i + 1, y=y))  # Add trials to the session.
+        session.add_trial(i + 1, y=y)  # Add trials to the session.
     # Trial is the basic container of trial-wise observation, regressor, latent factors and etc.
     # tid and y are only required argument to construct a trial of which tid is the unique identifier of the very trial,
     # and y is the spike train.

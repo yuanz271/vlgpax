@@ -32,20 +32,20 @@ def test_experiment():
     assert isinstance(expt.trials, list)
     assert not expt.trials
 
-    expt.add_trial(Trial(1, jnp.zeros((T, N))))
+    expt.add_trial(1, jnp.zeros((T, N)))
     with pytest.raises(AssertionError):
-        expt.add_trial(Trial(2, jnp.zeros((T, N + 1))))
+        expt.add_trial(2, jnp.zeros((T, N + 1)))
 
 
 def test_inference():
     T, N = 100, 10
     n_factors = 2
     expt = Session(1)
-    expt.add_trial(Trial(1, jnp.zeros((T, N))))
-    expt.add_trial(Trial(2, jnp.zeros((T, N))))
+    expt.add_trial(1, jnp.zeros((T, N)))
+    expt.add_trial(2, jnp.zeros((T, N)))
     lengthscale = 10.
     T_em = math.floor(lengthscale / expt.binsize)
     inference = vLGP(expt, n_factors, kernel=RBF(scale=1., lengthscale=lengthscale),
-                     T_em=T_em)
+                     T_split=T_em)
     assert inference.params.K[T].shape == (n_factors, T, T)
     assert inference.params.C.shape == (n_factors + 1, N)

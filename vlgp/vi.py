@@ -190,7 +190,7 @@ def make_em_session(session, T) -> Session:
     y = y[:n_trials * T]
     x = x[:n_trials * T]
     for i, (yi, xi) in enumerate(zip(jnp.split(y, n_trials), jnp.split(x, n_trials))):
-        em_session.add_trial(Trial(i, y=yi, x=xi))
+        em_session.add_trial(i, y=yi, x=xi)
 
     return em_session
 
@@ -199,7 +199,8 @@ class vLGP:
     def __init__(self, session: Session,
                  n_factors: int,
                  kernel: Union[Callable, Sequence[Callable]], *,
-                 T_split=100):
+                 T_split=100,
+                 fast_em=True):
         self.session = session
         self.params = Params(n_factors)
         self.params.T_split = T_split

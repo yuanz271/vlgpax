@@ -26,4 +26,4 @@ def test_cholesky_solve():
     La = jnp.linalg.cholesky(a)
     x2 = cholesky_solve(La, b)
 
-    assert jnp.allclose(x1, x2)
+    assert jnp.allclose(x1, x2, atol=1e-5, rtol=1e-5)

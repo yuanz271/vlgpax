@@ -64,7 +64,8 @@ class Session:
     tids: List[Any] = field(default_factory=list, repr=False, init=False)
     compact: bool = field(default=True, repr=False, init=False)
 
-    def add_trial(self, trial: Trial):
+    def add_trial(self, tid, y, x=None, t=None):
+        trial = Trial(tid, y, x, t)
         if self.trials:
             assert self.trials[0].is_consistent_with(trial)
         if trial.t is None:
