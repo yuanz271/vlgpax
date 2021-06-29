@@ -4,7 +4,7 @@ from typing import Any, Optional, List
 
 from jax import numpy as jnp
 
-__all__ = ['Trial', 'Session', 'Params']
+__all__ = ['Session', 'Params']
 
 
 @dataclass
@@ -14,7 +14,10 @@ class Params:
     K: Optional[Any] = None  # (n_factors, T, T)
     L: Optional[Any] = None  # (n_factors, T, T)
     logdet: Optional[Any] = None  # (n_factors, T)
-    T_split: int = None
+    algo: dict = field(default_factory=dict, repr=False, init=False)
+
+    def __getattr__(self, item):
+        return self.algo[item]
 
 
 @dataclass

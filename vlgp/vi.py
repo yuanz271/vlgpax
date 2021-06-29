@@ -32,7 +32,7 @@ from jax import lax, numpy as jnp
 from jax.numpy.linalg import solve
 from sklearn.decomposition import FactorAnalysis
 
-from .data import Session, Params, Trial
+from .data import Session, Params
 from .util import diag_embed, capped_exp, cholesky_solve
 
 __all__ = ['vLGP']
@@ -56,7 +56,6 @@ def single_trial_step(y, Cx, Cz, x, z, v, K, L, logdet, eps):
     u = v @ (Cz ** 2)
     lnr = x @ Cx + z @ Cz
     r = capped_exp(lnr + 0.5 * u)  # [x, z] C
-    # assert not jnp.any(jnp.isnan(r))
     w = r @ (Cz.T ** 2)
     z3d = jnp.expand_dims(z.T, -1)
     z_div_K = cholesky_solve(L, z3d)
@@ -74,7 +73,6 @@ def single_trial_step(y, Cx, Cz, x, z, v, K, L, logdet, eps):
     g = z_div_K + jnp.expand_dims(Cz @ (r - y).T, -1)  # (zdim, T, T) (zdim, T, 1)
     invH = V
     step = jnp.squeeze(invH @ g, -1).T  # V = inv(-Hessian)
-    # assert not jnp.any(jnp.isnan(step))
     return loss, step, v, w
 
 
@@ -203,9 +201,13 @@ class vLGP:
                  fast_em=True):
         self.session = session
         self.params = Params(n_factors)
-        self.params.T_split = T_split
+        self.params.algo['T_split'] = T_split
+        self.params.algo['fast_em'] = fast_em
         self.kernel = kernel
-        self.em_session = None  # for quick EM
+        if fast_em:
+            self.em_session = None
+        else:
+            self.em_session = self.session  # for quick EM
         self.init()
 
     def init(self):
@@ -215,7 +217,8 @@ class vLGP:
         n_regressors = trial.x.shape[-1]
         n_factors = self.params.n_factors
 
-        self.em_session = make_em_session(self.session, self.params.T_split)
+        if self.em_session is None:
+            self.em_session = make_em_session(self.session, self.params.T_split)
 
         fa = FactorAnalysis(n_components=self.params.n_factors)
         y = self.session.y
@@ -225,6 +228,9 @@ class vLGP:
         if self.params.C is None:
             self.params.C = jnp.zeros((n_factors + n_regressors, n_channels))
 
+        # init kernels
+        # a space efficient way of storing kernel matrices
+        # less efficient if many trials are of distinct length
         unique_Ts = np.unique([trial.T for trial in self.session.trials] + [self.params.T_split])
         ks = self.kernel if isinstance(self.kernel, Iterable) else [self.kernel] * n_factors
         self.params.K = {
@@ -243,7 +249,8 @@ class vLGP:
         # init trials
         typer.echo('Initializing')
         preprocess(self.session, self.params, initialize=fa.transform)
-        preprocess(self.em_session, self.params, initialize=fa.transform)
+        if self.params.fast_em:
+            preprocess(self.em_session, self.params, initialize=fa.transform)
         typer.secho('Initialized', fg=typer.colors.GREEN, bold=True)
 
     def fit(self, *, max_iter: int = 50):

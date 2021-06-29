@@ -22,7 +22,6 @@ def test_RFF():
     assert Kx.shape == (Nx, Nx)
 
     Kxx = ker(x, x)
-    print(Kx, Kxx)
     assert jnp.array_equal(Kx, Kxx)
 
     Kxy = ker(x, y)
