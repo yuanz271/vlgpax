@@ -29,6 +29,9 @@ class Trial:
     z: Optional[Any] = field(default=None, repr=False)  # posterior mean
     v: Optional[Any] = field(default=None, repr=False)  # posterior variance
     w: Optional[Any] = field(default=None, repr=False)
+    K: Optional[Any] = field(default=None, repr=False, init=False)
+    L: Optional[Any] = field(default=None, repr=False, init=False)
+    logdet: Optional[Any] = field(default=None, repr=False, init=False)
     T: int = field(default=None, repr=False, init=False)
 
     def __post_init__(self):
