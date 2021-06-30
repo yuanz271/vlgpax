@@ -1,4 +1,4 @@
-# variational Latent Gaussian Process (ported to JAX)
+# variational Latent Gaussian Process with JAX
 
 [![license](https://img.shields.io/github/license/mashape/apistatus.svg?style=flat-square)]()
 [![python 3.8](https://img.shields.io/badge/python-3.8-blue.svg?style=flat-square)]()
@@ -8,19 +8,19 @@
 This repo contains the implementation of [variational Latent Gaussian Process (vLGP)](https://doi.org/10.1162/NECO_a_00953) 
 ([arXiv](https://arxiv.org/abs/1604.03053)) 
 ([video](https://youtu.be/CrY5AfNH1ik)) by 
-Yuan Zhao ([yuan.zhao@stonybrook.edu](yuan.zhao@stonybrook.edu])) and 
+Yuan Zhao ([yuan.zhao@stonybrook.edu](yuan.zhao@stonybrook.edu)) and 
 Il Memming Park ([memming.park@stonybrook.edu](memming.park@stonybrook.edu)).
 It has been developed with the goal of recovering low-dimensional dynamics from neural population recordings. 
 
 ## Installation
 
 ```bash
-pip install git+https://github.com/catniplab/vlgp.git
+pip install git+https://github.com/yuanz271/vlgpax.git
 ```
 
 ## Get started
 
-Try the [example](script/example.py).
+Learn how to use vLGP in the [example](script/example.py).
 
 ### Data structure
 - `Trial` A single trial
@@ -28,7 +28,7 @@ Try the [example](script/example.py).
   - `x` regressors
   - `z` latent factors
   - `v` posterior variances
-  - `w` diagonals of W matrices  
+  - `w` diagonals of W matrices
 - `Session` A container of trials
   - `trials` list of `Trial`s
   - `binsize` 
@@ -37,7 +37,7 @@ Try the [example](script/example.py).
   - `n_factors` number of latent factors
   - `K` kernel matrices
   - `logdet` log determinant of `K`s  
-- `Inference` Wrapper of algorithm
+- `vLGP` Wrapper of algorithm
   - `session`
   - `params`
   - `kernel` kernel functions
@@ -63,16 +63,3 @@ Try the [example](script/example.py).
 2021
 
 - port to JAX
-
-2018
-
-- New uniform data structure
-- Support trials of unequal duration
-- Faster
-- Use NumPy data format
-
-2017
-
-- New ```fit``` function now only requires observation and the number of latent.
-- Save snapshots if *path* is passed to ```fit```.
-- You can access the iterations via *callback*.
