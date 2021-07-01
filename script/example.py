@@ -45,7 +45,7 @@ def main():
     # tid is an unique identifier of the trial,
     # y is the spike train,
     # x is an optional argument that represents regressors such as spike history, stimuli, behavior, neuron coupling and etc. 
-    # A all-one column x is generated automatically if absent
+    # An constant column for bias is generated automatically if x is absent
 
     # %% Build the model
     kernel = RBF(scale=1., lengthscale=100 * dt)  # RBF kernel
