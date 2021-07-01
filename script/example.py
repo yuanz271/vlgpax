@@ -55,7 +55,7 @@ def main():
     # kernel = RFF(key, 50, 1, scale=1., lengthscale=100 * dt)
     model = vLGP(session, n_factors=2, kernel=kernel)
     # Inference requires the target `session`, the number of factors `n_factors`, and the `kernel` function.
-    # `kernel` is typically a kernel function. It can be a `callable` or a list of `callable`s corresponding to the factors.
+    # `kernel` is a kernel function or a list of them corresponding to the factors.
     # RBF kernel is implemented in `gp.kernel`. You may write your own kernels.
 
     ax[3].plot(session.z)  # Draw the initial factors
