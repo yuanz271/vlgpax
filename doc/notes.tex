@@ -1,0 +1,160 @@
+\documentclass{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage{mathtools, amssymb}
+\usepackage{forloop}
+
+%%
+\newcommand{\defvec}[1]{\expandafter\newcommand\csname v#1\endcsname{{\mathbf{#1}}}}
+\newcounter{ct}
+\forLoop{1}{26}{ct}{
+    \edef\letter{\alph{ct}}
+    \expandafter\defvec\letter
+}
+% captial i A
+\forLoop{1}{26}{ct}{
+    \edef\letter{\Alph{ct}}
+    \expandafter\defvec\letter
+}
+
+\DeclareMathOperator{\E}{\mathbb{E}}
+\DeclareMathOperator{\tr}{\mathrm{tr}}
+\DeclareMathOperator{\diag}{\mathrm{diag}}
+\DeclareMathOperator{\Diag}{\mathrm{Diag}}
+\DeclareMathOperator{\var}{\mathrm{var}}
+\DeclareMathOperator{\df}{\mathcal{D}}
+\DeclareMathOperator{\D}{\nabla}
+\newcommand{\vone}{\mathbf{1}}
+%%
+
+\title{Notes}
+
+
+\begin{document}
+    
+    \maketitle
+    
+    \section{vLGP Model}
+    Assume $m$ independent factors with GP priors
+    \begin{equation}
+        \begin{aligned}
+            x_0 &= \text{regressors} \\
+            x_1 &\sim GP(0, k_1 (t, t')) \\
+            &\vdots \\
+            x_m &\sim GP(0, k_m (t, t')) \\
+            y &\sim P(y \mid \exp\left[(x_0, x_1, 
+            \ldots, x_m) C^\top\right]
+        \end{aligned}    
+    \end{equation}
+    where $C_i$'s are $n$-by-$(m+1)$ loading matrices corresponding to factor $x_i$'s.
+
+    \section{VI}
+    The approximate posterior of $x_1 \ldots x_m$ are assumed factorized among factors
+    \begin{equation}
+        q(x_1 \ldots x_m) = \prod_i^m q_i(x_i)
+    \end{equation}
+    where each
+    \begin{equation}
+        q_i(x_i) = \mathcal{N}(\mu_i, V_i)
+    \end{equation}   
+
+    \subsection{Lower bound}
+    With $C^\top = (c_1, \ldots, c_n)$, we can write the lower bound to the marginal log-likelihood as
+    \begin{equation}
+        \begin{aligned}
+        \mathcal{L} 
+            &= \E_{q} \left[\ln p(y \mid x_1 \ldots x_m) + \ln p(x_1 \ldots x_m) - \ln q(x_1 \ldots x_m) \right] \\
+            &= \E_{q} \left[\ln p(y \mid x_1 \ldots x_m) + \sum_i \ln p(x_i) - \sum_i \ln q(x_i) \right] \\
+            &= \E_{q} \left\{ \sum_j (y_j^\top Xc_j - \vone^\top e^{Xc_j}) + \sum_i -\frac{1}{2}[\ln\det K_i + x_i^\top K_i^{-1} x_i + T\ln(2\pi)] - \sum_i \ln q(x_i) \right\} \\ 
+            &= \sum_j \E_{q} \ln p(y_j \mid X, c_j) \\
+            &\qquad - \frac{1}{2} \sum_i \left[ \ln\det K_i + \mu_i^\top K_i^{-1} \mu_i + \tr(K_i^{-1} V_i) + T\ln(2\pi) \right] \\
+            &\qquad + \frac{1}{2} \sum_i \left[ \ln\det V_i + T + T\ln(2\pi) \right]
+        \end{aligned}
+    \end{equation}
+    where
+    \begin{equation}
+        \begin{aligned}
+               \E_{q} \ln p(y \mid X, c) 
+            =& \E_{q} \left[ y^\top X c - \vone^\top e^{X c} \right] \\
+            =& \E_{q} \left[ y^\top [x_1, \ldots, x_m] (c_1, \ldots, c_m)^\top - \vone^\top e^{X c} \right] \\
+            =& \E_{q} \left[ y^\top \sum_i c_i x_i - \vone^\top \exp(\sum_i c_i x_i) \right] \\
+            =& y^\top \sum_i c_i \mu_i - \vone^\top \exp \left( \sum_i c_i \mu_i + \frac{1}{2} c_i \diag(V_i) c_i \right) \\
+            =& y^\top M c - \tr \left[ \exp \left( \Diag(Mc) + \sum_i \frac{1}{2} c_i V_i c_i \right) \right]
+            =& y^\top M c - \tr \left[ \exp \left( \sum_k E_k (Mc) e_k^\top + \sum_i \frac{1}{2} c_i V_i c_i \right) \right]  
+        \end{aligned}
+    \end{equation}
+    and
+    \begin{equation}
+        \E_{q} \ln p(y \mid [x_1, \ldots, x_m], C)
+        = \sum_j \left\{ y_j^\top \sum_i \mu_i c_{ij} - \tr \left[\exp \left(\sum_k E_k (Mc) e_k^\top + \sum_i \frac{1}{2} c_{ij} V_i c_{ij} \right) \right] \right\}
+    \end{equation}    
+
+    \subsection{Gradient and Hessian}
+    For the $i$-th factor, 
+    \begin{align}
+        \D_{\mu_i} \mathcal{L}  
+            =& \sum_j \left\{ y_j^\top c_{ij} - \lambda_j^\top c_{ij}  \right\} - K_i^{-1} \mu_i = (y - \lambda) c_i - K_i^{-1} \mu_i \\
+        \D_{\mu_i}^2 \mathcal{L}
+            =& \sum_j - c_{ij} \Lambda_j  c_{ij} - K_i^{-1} \\
+        \D_{V_i} \mathcal{L} 
+            =& \sum_j - \Lambda_j c_{ij}^2 - \frac{1}{2} K_i^{-1} + \frac{1}{2} V_i^{-1} 
+    \end{align}
+
+    Setting $\nabla_{V_i} \mathcal{L} = 0$, we have
+    \begin{equation}
+        V_i^{-1} = \sum_j \Lambda_j c_{ij}^2  + K_i^{-1}
+    \end{equation}
+    We denote the first term by $W$.
+    \begin{equation}
+        W = \sum_j W_j = \sum_j \Lambda_j c_{ij}^2
+    \end{equation}
+    
+    For $j$-th neuron,
+    \begin{align}
+        \D_{c_j} \mathcal{L}  
+        =& (y_j - \lambda_j)^\top M \\
+        \D_{c_j}^2 \mathcal{L}
+        =& - M^\top \Lambda_j M
+    \end{align}
+    
+
+    \section{Random Fourier Features}
+    \begin{align}
+        k(x, y) \approx& z(x)^\top z(y) \\
+        z(x) =& 
+        \begin{bmatrix} 
+            \frac{1}{\sqrt{R}} z_{\omega_1}(x) \\
+            \vdots \\
+            \frac{1}{\sqrt{R}} z_{\omega_R}(x) \\
+        \end{bmatrix} \\
+        z_{\omega_1} =& \sqrt{2}\cos(\omega^\top x + b) \\
+        \omega \sim & p(\omega) \\
+        b \sim & \text{Uniform}(0, 2 \pi)
+    \end{align}
+    
+    \section{Math}
+    \begin{equation}
+        \begin{bmatrix}
+            d_1 & & \\
+            & \ddots & \\
+            & & d_m
+        \end{bmatrix}
+        \begin{bmatrix}
+            c_{11} & & c_{1n} \\
+            & \ddots & \\
+            c_{m1} & & c_{mn}
+        \end{bmatrix}
+        =
+        \begin{bmatrix}
+            d_1 c_{11} & & d_1 c_{1n} \\
+            & \ddots & \\
+            d_m c_{m1} & & d_m c_{mn}
+        \end{bmatrix}
+        =
+    \begin{bmatrix}
+        d_1 \vc_{1\cdot}\\
+         \vdots  \\
+        d_m \vc_{m\cdot}
+    \end{bmatrix}
+    \end{equation}
+\end{document}
