@@ -40,22 +40,22 @@ def main():
     # Session is the top level container of data. Two arguments, binsize and unit of time, are required at construction.
     for i, y in enumerate(ys):
         session.add_trial(i + 1, y=y)  # Add trials to the session.
-    # Trial is the basic container of trial-wise observation, regressor, latent factors and etc.
-    # tid and y are only required argument to construct a trial of which tid is the unique identifier of the very trial,
-    # and y is the spike train.
-    # x is an optional argument that represents regressors such as spike history, stimuli, behavior, neuron coupling
-    # and etc. It will be a column vector of all ones automatically if not given.
+    # Trial is the basic unit of observation, regressor, latent factors and etc.
+    # tid and y are only required argument to construct a trial. 
+    # tid is an unique identifier of the trial,
+    # y is the spike train,
+    # x is an optional argument that represents regressors such as spike history, stimuli, behavior, neuron coupling and etc. 
+    # A all-one column x is generated automatically if absent
 
     # %% Build the model
-    # kernel = RBF(scale=1., lengthscale=100 * dt)
-    key = jax.random.PRNGKey(0)
-    kernel = RFF(key, 50, 1, scale=1., lengthscale=100 * dt)
+    kernel = RBF(scale=1., lengthscale=100 * dt)  # RBF kernel
+    # key = jax.random.PRNGKey(0)
+    # kernel = RFF(key, 50, 1, scale=1., lengthscale=100 * dt)
     model = vLGP(session, n_factors=2,
                  kernel=kernel)
     # Inference requires the target `session`, the number of factors `n_factors`, and the `kernel` function.
-    # `kernel` is typically a kernel function. It can be a `callable` or a list of `callable`s. When it is a list,
-    # it should contain the kernel functions corresponding to the factors.
-    # RBF kernel is implemented in `gp.kernel`. You may write your own kernels following the RBF.
+    # `kernel` is typically a kernel function. It can be a `callable` or a list of `callable`s corresponding to the factors. 
+    # RBF kernel is implemented in `gp.kernel`. You may write your own kernels.
 
     ax[3].plot(session.z)  # Draw the initial factors
     # Session supports direct access to the fields of trial. It concatenate the requested field of all the trials.
