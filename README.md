@@ -26,20 +26,19 @@ Learn how to use vLGP in the [example](script/example.py).
 - `Trial` A single trial
   - `y` spike train
   - `x` regressors
-  - `z` latent factors
+  - `t` timing of bins
+  - `z` posterior mean
   - `v` posterior variances
-  - `w` diagonals of W matrices
 - `Session` A container of trials
   - `trials` list of `Trial`s
-  - `binsize` 
-  - `unit` *str*, unit of time
+  - `binsize` binwidth if evenly-spaced timing
 - `Params` Parameters
   - `n_factors` number of latent factors
+  - `C` loading matrix and bias, (n_factors + n_regressors, n_neurons)
   - `K` kernel matrices
-  - `logdet` log determinant of `K`s  
 - `vLGP` Wrapper of algorithm
-  - `session`
-  - `params`
+  - `session` Session
+  - `params` Params
   - `kernel` kernel functions
     
 ## Citation
