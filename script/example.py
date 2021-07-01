@@ -23,7 +23,8 @@ def main():
     # %% Generate Poisson observation
     N = 10  # 10D
     x = np.column_stack([z, np.ones(T)])  # Append a constant column for bias
-    C = np.random.randn(x.shape[-1], N)  # Sample the loading matrix from Gaussian
+    C = np.random.randn(x.shape[-1],
+                        N)  # Sample the loading matrix from Gaussian
     C[-1, :] = -1.5  # less spikes per bin
     r = np.exp(x @ C)  # firing rate
     y = np.random.poisson(r)  # spikes
@@ -35,26 +36,26 @@ def main():
     ax[2].imshow(y.T, aspect='auto')  # show spikes in heatmap
 
     # %% Setup inference
-    ys = np.reshape(y, (10, T // 10, -1))  # Split the spike train into 10 trials
+    ys = np.reshape(y,
+                    (10, T // 10, -1))  # Split the spike train into 10 trials
     session = Session(dt)  # Construct a session.
     # Session is the top level container of data. Two arguments, binsize and unit of time, are required at construction.
     for i, y in enumerate(ys):
         session.add_trial(i + 1, y=y)  # Add trials to the session.
     # Trial is the basic unit of observation, regressor, latent factors and etc.
-    # tid and y are only required argument to construct a trial. 
+    # tid and y are only required argument to construct a trial.
     # tid is an unique identifier of the trial,
     # y is the spike train,
-    # x is an optional argument that represents regressors such as spike history, stimuli, behavior, neuron coupling and etc. 
+    # x is an optional argument that represents regressors such as spike history, stimuli, behavior, neuron coupling and etc.
     # An constant column for bias is generated automatically if x is absent
 
     # %% Build the model
     kernel = RBF(scale=1., lengthscale=100 * dt)  # RBF kernel
     # key = jax.random.PRNGKey(0)
     # kernel = RFF(key, 50, 1, scale=1., lengthscale=100 * dt)
-    model = vLGP(session, n_factors=2,
-                 kernel=kernel)
+    model = vLGP(session, n_factors=2, kernel=kernel)
     # Inference requires the target `session`, the number of factors `n_factors`, and the `kernel` function.
-    # `kernel` is typically a kernel function. It can be a `callable` or a list of `callable`s corresponding to the factors. 
+    # `kernel` is typically a kernel function. It can be a `callable` or a list of `callable`s corresponding to the factors.
     # RBF kernel is implemented in `gp.kernel`. You may write your own kernels.
 
     ax[3].plot(session.z)  # Draw the initial factors

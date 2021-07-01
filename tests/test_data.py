@@ -45,7 +45,9 @@ def test_inference():
     expt.add_trial(2, jnp.zeros((T, N)))
     lengthscale = 10.
     T_em = math.floor(lengthscale / expt.binsize)
-    inference = vLGP(expt, n_factors, kernel=RBF(scale=1., lengthscale=lengthscale),
+    inference = vLGP(expt,
+                     n_factors,
+                     kernel=RBF(scale=1., lengthscale=lengthscale),
                      T_split=T_em)
     assert inference.params.K[T].shape == (n_factors, T, T)
     assert inference.params.C.shape == (n_factors + 1, N)

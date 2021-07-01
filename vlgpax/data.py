@@ -76,7 +76,8 @@ class Session:
             assert self.trials[0].is_consistent_with(trial)
         if trial.t is None:
             assert self.binsize is not None, 'The trial must contain field t if binsize is None'
-            trial.t = jnp.arange(trial.y.shape[0] * self.binsize, step=self.binsize)
+            trial.t = jnp.arange(trial.y.shape[0] * self.binsize,
+                                 step=self.binsize)
         else:
             self.compact = False
         self.trials.append(trial)

@@ -16,7 +16,12 @@ def test_RFF():
     x = jax.random.normal(key, (Nx, dim))
     y = jax.random.normal(key, (Ny, dim))
 
-    ker = kernel.RFF(key, size=size, dim=dim, scale=scale, lengthscale=lengthscale, jitter=0.)
+    ker = kernel.RFF(key,
+                     size=size,
+                     dim=dim,
+                     scale=scale,
+                     lengthscale=lengthscale,
+                     jitter=0.)
 
     Kx = ker(x)
     assert Kx.shape == (Nx, Nx)

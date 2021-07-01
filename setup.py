@@ -1,6 +1,5 @@
 from distutils.core import setup
 
-
 setup(
     name="vlgpax",
     version="2021.6.21",

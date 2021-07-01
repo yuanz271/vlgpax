@@ -20,7 +20,10 @@ def cdist(x: Array, y: Array, dist: Callable = sqdist) -> Array:
 
 
 class RBF:
-    def __init__(self, scale: float = 1., lengthscale: float = 1., jitter=1e-5) -> None:
+    def __init__(self,
+                 scale: float = 1.,
+                 lengthscale: float = 1.,
+                 jitter=1e-5) -> None:
         self.scale = scale
         self.lengthscale = lengthscale
         self.jitter = jitter
@@ -36,8 +39,13 @@ class RBF:
 
 
 class RFF:
-    def __init__(self, key: PRNGKey, size: int, dim: int,
-                 scale: float = 1., lengthscale: float = 1., jitter=1e-5) -> None:
+    def __init__(self,
+                 key: PRNGKey,
+                 size: int,
+                 dim: int,
+                 scale: float = 1.,
+                 lengthscale: float = 1.,
+                 jitter=1e-5) -> None:
         self.key = key
         self.z = jnp.sqrt(2. / size)
         self.scale = scale

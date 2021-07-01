@@ -3,7 +3,6 @@ import warnings
 import jax
 from jax import lax, numpy as jnp
 
-
 diag_embed = jax.jit(jax.vmap(jnp.diag))
 
 batch_lstsq = jax.jit(jax.vmap(lambda a, b: jnp.linalg.lstsq(a, b)[0]))
@@ -35,8 +34,16 @@ def cholesky_solve(L, b):
     :return:
     """
     lower = True
-    b = lax.linalg.triangular_solve(L, b, left_side=True, lower=lower,
-                                    transpose_a=not lower, conjugate_a=not lower)
-    b = lax.linalg.triangular_solve(L, b, left_side=True, lower=lower,
-                                    transpose_a=lower, conjugate_a=lower)
+    b = lax.linalg.triangular_solve(L,
+                                    b,
+                                    left_side=True,
+                                    lower=lower,
+                                    transpose_a=not lower,
+                                    conjugate_a=not lower)
+    b = lax.linalg.triangular_solve(L,
+                                    b,
+                                    left_side=True,
+                                    lower=lower,
+                                    transpose_a=lower,
+                                    conjugate_a=lower)
     return b
