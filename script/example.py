@@ -4,13 +4,13 @@ import jax.random
 import numpy as np
 from matplotlib import pyplot as plt
 
-from vlgp.data import Session
-from vlgp.kernel import RBF, RFF
-from vlgp.vi import vLGP
+from vlgpax.data import Session
+from vlgpax.kernel import RBF, RFF
+from vlgpax.vi import vLGP
 
 from jax.config import config
 
-config.update('jax_enable_x64', True)
+config.update('jax_enable_x64', True)  # use 64bit float
 
 
 def main():

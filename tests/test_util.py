@@ -1,7 +1,7 @@
 import numpy as np
 from jax import numpy as jnp, scipy as jsp
 
-from vlgp.util import batch_lstsq, cholesky_solve
+from vlgpax.util import batch_lstsq, cholesky_solve
 
 
 def test_stable_solve():

@@ -2,10 +2,10 @@ from distutils.core import setup
 
 
 setup(
-    name="vlgp",
+    name="vlgpax",
     version="2021.6.21",
-    packages=["vlgp"],
-    url="https://github.com/catniplab/vlgp",
+    packages=["vlgpax"],
+    url="https://github.com/yuanz271/vlgpax",
     license="MIT",
     author="yuan",
     author_email="yuanz271@gmail.com",

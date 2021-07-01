@@ -5,7 +5,7 @@
 
 ## Introduction
 
-This repo contains the implementation of [variational Latent Gaussian Process (vLGP)](https://doi.org/10.1162/NECO_a_00953) 
+This repo contains a JAX implementation of [variational Latent Gaussian Process (vLGP)](https://doi.org/10.1162/NECO_a_00953) 
 ([arXiv](https://arxiv.org/abs/1604.03053)) 
 ([video](https://youtu.be/CrY5AfNH1ik)) by 
 Yuan Zhao ([yuan.zhao@stonybrook.edu](yuan.zhao@stonybrook.edu)) and 
@@ -20,7 +20,7 @@ pip install git+https://github.com/yuanz271/vlgpax.git
 
 ## Get started
 
-Learn how to use vLGP in the [example](script/example.py).
+Learn how to use it in the [example](script/example.py).
 
 ### Data structure
 - `Trial` A single trial

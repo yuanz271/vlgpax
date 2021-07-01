@@ -4,9 +4,9 @@ import jax
 from jax import numpy as jnp
 import pytest
 
-from vlgp.data import Session, Trial
-from vlgp.kernel import RBF
-from vlgp.vi import vLGP
+from vlgpax.data import Session, Trial
+from vlgpax.kernel import RBF
+from vlgpax.vi import vLGP
 
 
 def test_trial():
