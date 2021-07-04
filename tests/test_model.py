@@ -2,7 +2,7 @@ import pytest
 from jax import numpy as jnp
 
 from context import vlgpax
-from vlgpax.data import Session, Trial
+from vlgpax.model import Session, Trial
 
 
 def test_trial():

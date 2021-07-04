@@ -25,7 +25,6 @@
 import pickle
 import random
 import time
-from collections.abc import Iterable
 from typing import Union, Sequence, Callable
 
 import jax
@@ -35,7 +34,7 @@ from jax import lax, numpy as jnp
 from jax.numpy.linalg import solve
 from sklearn.decomposition import FactorAnalysis
 
-from .data import Session, Params
+from .model import Session, Params
 from .util import diag_embed, capped_exp, cholesky_solve
 
 __all__ = ['vLGP', 'reconstruct_cov']
@@ -243,7 +242,7 @@ class vLGP:
                  ):
         self.key = jax.random.PRNGKey(random.getrandbits(32))  # 32bit
         self.session = session
-        self.params = Params(n_factors)
+        self.params = Params(n_factors, kernel)
         self.params.EM.fast = fast_em
         self.params.EM.trial_length = T_em
         self.kernel = kernel
@@ -278,13 +277,11 @@ class vLGP:
         # less efficient if many trials are of distinct length
         unique_Ts = np.unique([trial.T for trial in self.session.trials] +
                               [self.params.EM.trial_length])
-        ks = self.kernel if isinstance(self.kernel,
-                                       Iterable) else [self.kernel] * n_factors
         self.params.K = {
             T: jnp.stack([
                 k(
                     jnp.arange(T * self.session.binsize,
-                               step=self.session.binsize)) for k in ks
+                               step=self.session.binsize)) for k in self.params.kernel
             ])
             for T in unique_Ts
         }

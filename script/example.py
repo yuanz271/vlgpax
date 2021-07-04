@@ -4,7 +4,7 @@ import jax.random
 import numpy as np
 from matplotlib import pyplot as plt
 
-from vlgpax.data import Session
+from vlgpax.model import Session
 from vlgpax.kernel import RBF, RFF
 from vlgpax.vi import vLGP
 
