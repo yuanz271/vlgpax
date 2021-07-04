@@ -94,11 +94,12 @@ def invalid(delta):
 def estep(session: Session,
           params: Params,
           *,
-          stepsize=1.,
-          clip=default_clip,
-          eps: float = default_eps,
           verbose: bool = False) -> float:
     max_iter = params.EM.e_max_iter
+    clip = params.EM.clip
+    eps = params.EM.eps
+    stepsize = params.EM.stepsize
+
     zdim = params.n_factors
     C = params.C  # (zdim + xdim, ydim)
     Cz, Cx = jnp.vsplit(C, [zdim])  # (n_factors + n_regressors, n_channels)
@@ -166,11 +167,12 @@ def m_loss_newton(y, C, Cz, M, v):
 
 
 def mstep(session: Session,
-          params: Params,
-          *,
-          stepsize=1.,
-          clip=default_clip):
+          params: Params):
     max_iter = params.EM.m_max_iter
+    clip = params.EM.clip
+    # eps = params.EM.eps
+    stepsize = params.EM.stepsize
+
     zdim = params.n_factors
     C = params.C  # (zdim + xdim, ydim)
 

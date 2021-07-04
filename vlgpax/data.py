@@ -13,6 +13,9 @@ class EMParams:
     m_max_iter: int = 50
     fast: bool = True
     trial_length: int = 100
+    clip: float = 3.
+    eps: float = 1e-6
+    stepsize: float = 1.
 
 
 @dataclass
