@@ -94,11 +94,11 @@ def invalid(delta):
 def estep(session: Session,
           params: Params,
           *,
-          max_iter: int = 50,
           stepsize=1.,
           clip=default_clip,
           eps: float = default_eps,
           verbose: bool = False) -> float:
+    max_iter = params.EM.e_max_iter
     zdim = params.n_factors
     C = params.C  # (zdim + xdim, ydim)
     Cz, Cx = jnp.vsplit(C, [zdim])  # (n_factors + n_regressors, n_channels)
@@ -168,9 +168,9 @@ def m_loss_newton(y, C, Cz, M, v):
 def mstep(session: Session,
           params: Params,
           *,
-          max_iter: int = 50,
           stepsize=1.,
           clip=default_clip):
+    max_iter = params.EM.m_max_iter
     zdim = params.n_factors
     C = params.C  # (zdim + xdim, ydim)
 
@@ -237,15 +237,16 @@ class vLGP:
                  n_factors: int,
                  kernel: Union[Callable, Sequence[Callable]],
                  *,
-                 T_split=100,
-                 fast_em=True):
+                 fast_em=True,
+                 T_em=100,
+                 ):
         self.key = jax.random.PRNGKey(int(random.random() * 10))
         self.session = session
         self.params = Params(n_factors)
-        self.params.algo['T_split'] = T_split
-        self.params.algo['fast_em'] = fast_em
+        self.params.EM.fast = fast_em
+        self.params.EM.trial_length = T_em
         self.kernel = kernel
-        if fast_em:
+        if self.params.EM.fast:
             self.em_session = None
         else:
             self.em_session = self.session  # for quick EM
@@ -260,7 +261,7 @@ class vLGP:
 
         if self.em_session is None:
             self.em_session = make_em_session(self.session,
-                                              self.params.T_split)
+                                              self.params.EM.trial_length)
 
         fa = FactorAnalysis(n_components=self.params.n_factors)
         y = self.session.y
@@ -275,7 +276,7 @@ class vLGP:
         # a space efficient way of storing kernel matrices
         # less efficient if many trials are of distinct length
         unique_Ts = np.unique([trial.T for trial in self.session.trials] +
-                              [self.params.T_split])
+                              [self.params.EM.trial_length])
         ks = self.kernel if isinstance(self.kernel,
                                        Iterable) else [self.kernel] * n_factors
         self.params.K = {
@@ -299,7 +300,7 @@ class vLGP:
         # init trials
         typer.echo('Initializing')
         preprocess(self.session, self.params, initialize=fa.transform)
-        if self.params.fast_em:
+        if self.params.EM.fast:
             preprocess(self.em_session, self.params, initialize=fa.transform)
         typer.secho('Initialized', fg=typer.colors.GREEN, bold=True)
 

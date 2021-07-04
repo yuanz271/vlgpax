@@ -48,6 +48,6 @@ def test_inference():
     inference = vLGP(expt,
                      n_factors,
                      kernel=RBF(scale=1., lengthscale=lengthscale),
-                     T_split=T_em)
+                     T_em=T_em)
     assert inference.params.K[T].shape == (n_factors, T, T)
     assert inference.params.C.shape == (n_factors + 1, N)

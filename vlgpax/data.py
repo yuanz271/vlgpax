@@ -8,16 +8,21 @@ __all__ = ['Session', 'Params']
 
 
 @dataclass
+class EMParams:
+    e_max_iter: int = 50
+    m_max_iter: int = 50
+    fast: bool = True
+    trial_length: int = 100
+
+
+@dataclass
 class Params:
     n_factors: int
     C: Optional[Any] = None  # (n_factors + n_regressors, n_channels)
     K: Optional[Any] = None  # (n_factors, T, T)
     L: Optional[Any] = None  # (n_factors, T, T)
     logdet: Optional[Any] = None  # (n_factors, T)
-    algo: dict = field(default_factory=dict, repr=False, init=False)
-
-    def __getattr__(self, item):
-        return self.algo[item]
+    EM: EMParams = field(default=EMParams(), repr=False, init=False)  # EM algorithm settings
 
 
 @dataclass
