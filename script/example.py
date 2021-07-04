@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 
 from vlgpax.model import Session
 from vlgpax.kernel import RBF, RFF
-from vlgpax.vi import vLGP
+from vlgpax import vi
 
 from jax.config import config
 
@@ -30,7 +30,7 @@ def main():
     y = np.random.poisson(r)  # spikes
 
     # %% Draw all
-    fig, ax = plt.subplots(5, 1, sharex='all')
+    fig, ax = plt.subplots(4, 1, sharex='all')
     ax[0].plot(z)  # latent
     ax[1].plot(y)  # spikes
     ax[2].imshow(y.T, aspect='auto')  # show spikes in heatmap
@@ -46,22 +46,20 @@ def main():
     # tid and y are only required argument to construct a trial.
     # tid is an unique identifier of the trial,
     # y is the spike train,
-    # x is an optional argument that represents regressors such as spike history, stimuli, behavior, neuron coupling and etc.
+    # x is an optional argument that represents the design matrix of
+    # such as spike history, stimuli, behavior, neuron coupling and etc.
     # An constant column for bias is generated automatically if x is absent
 
     # %% Build the model
     kernel = RBF(scale=1., lengthscale=100 * dt)  # RBF kernel
     # key = jax.random.PRNGKey(0)
     # kernel = RFF(key, 50, 1, scale=1., lengthscale=100 * dt)
-    model = vLGP(session, n_factors=2, kernel=kernel)
-    # Inference requires the target `session`, the number of factors `n_factors`, and the `kernel` function.
+    session, params = vi.fit(session, n_factors=2, kernel=kernel)
+    # `fit` requires the target `session`, the number of factors `n_factors`, and the `kernel` function.
     # `kernel` is a kernel function or a list of them corresponding to the factors.
     # RBF kernel is implemented in `gp.kernel`. You may write your own kernels.
 
-    ax[3].plot(session.z)  # Draw the initial factors
     # Session supports direct access to the fields of trial. It concatenate the requested field of all the trials.
-
-    model.fit(max_iter=100)  # Do the job
     # After fitting, the following fields will be filled in each trial
     # z: psoterior mean of latent factors, (T, factor)
     # v: posterior variance of latent factors, (T, factor)
@@ -69,7 +67,7 @@ def main():
     # Note that the fit doesn't keep posterior covariance of each factor
     # to save space, but they can be reconstructed.
 
-    ax[4].plot(session.z)  # Draw the result
+    ax[3].plot(session.z)  # Draw the result
     plt.show()
     plt.close()
 

@@ -9,6 +9,7 @@ __all__ = ['Session', 'Params']
 
 @dataclass
 class EMParams:
+    max_iter: int = 50
     e_max_iter: int = 50
     m_max_iter: int = 50
     fast: bool = True
@@ -21,7 +22,7 @@ class EMParams:
 @dataclass
 class Params:
     n_factors: int
-    kernel: Iterable [Callable] = None
+    kernel: Iterable[Callable] = None
     C: Optional[Any] = None  # (n_factors + n_regressors, n_channels)
     K: Optional[Any] = None  # (n_factors, T, T)
     L: Optional[Any] = None  # (n_factors, T, T)

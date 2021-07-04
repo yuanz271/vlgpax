@@ -22,7 +22,6 @@
 # L: Array(M, T, T), K = LL'
 # V: Array(M, T, T), posterior covariance
 ######################
-import pickle
 import random
 import time
 from typing import Union, Sequence, Callable
@@ -37,7 +36,7 @@ from sklearn.decomposition import FactorAnalysis
 from .model import Session, Params
 from .util import diag_embed, capped_exp, cholesky_solve
 
-__all__ = ['vLGP', 'reconstruct_cov']
+__all__ = ['fit', 'reconstruct_cov']
 
 
 @jax.jit
@@ -231,125 +230,103 @@ def make_em_session(session: Session, T: int) -> Session:
     return em_session
 
 
-class vLGP:
-    def __init__(self,
-                 session: Session,
-                 n_factors: int,
-                 kernel: Union[Callable, Sequence[Callable]],
-                 *,
-                 fast_em=True,
-                 T_em=100,
-                 ):
-        self.key = jax.random.PRNGKey(random.getrandbits(32))  # 32bit
-        self.session = session
-        self.params = Params(n_factors, kernel)
-        self.params.EM.fast = fast_em
-        self.params.EM.trial_length = T_em
-        self.kernel = kernel
-        if self.params.EM.fast:
-            self.em_session = None
-        else:
-            self.em_session = self.session  # for quick EM
-        self.init()
+def init(session, params):
+    assert session.trials
+    key = jax.random.PRNGKey(random.getrandbits(32))
 
-    def init(self):
-        assert self.session.trials
-        trial = self.session.trials[0]
-        n_channels = trial.y.shape[-1]
-        n_regressors = trial.x.shape[-1]
-        n_factors = self.params.n_factors
+    trial = session.trials[0]
+    n_channels = trial.y.shape[-1]
+    n_regressors = trial.x.shape[-1]
+    n_factors = params.n_factors
 
-        if self.em_session is None:
-            self.em_session = make_em_session(self.session,
-                                              self.params.EM.trial_length)
+    if params.EM.fast:
+        em_session = make_em_session(session, params.EM.trial_length)
+    else:
+        em_session = session
 
-        fa = FactorAnalysis(n_components=self.params.n_factors)
-        y = self.session.y
-        fa = fa.fit(y)
+    fa = FactorAnalysis(n_components=params.n_factors)
+    y = session.y
+    fa = fa.fit(y)
 
-        # init params
-        if self.params.C is None:
-            self.params.C = jax.random.normal(self.key, (n_factors + n_regressors, n_channels)) / \
-                            jnp.sqrt((n_factors + n_regressors) * n_channels)
+    # init params
+    if params.C is None:
+        params.C = jax.random.normal(key, (n_factors + n_regressors, n_channels)) / \
+                        jnp.sqrt((n_factors + n_regressors) * n_channels)
 
-        # init kernels
-        # a space efficient way of storing kernel matrices
-        # less efficient if many trials are of distinct length
-        unique_Ts = np.unique([trial.T for trial in self.session.trials] +
-                              [self.params.EM.trial_length])
-        self.params.K = {
-            T: jnp.stack([
-                k(
-                    jnp.arange(T * self.session.binsize,
-                               step=self.session.binsize)) for k in self.params.kernel
-            ])
-            for T in unique_Ts
-        }
+    # init kernels
+    # a space efficient way of storing kernel matrices
+    # less efficient if many trials are of distinct length
+    unique_Ts = np.unique([trial.T for trial in session.trials] +
+                          [params.EM.trial_length])
+    params.K = {
+        T: jnp.stack([
+            k(
+                jnp.arange(T * session.binsize,
+                           step=session.binsize)) for k in params.kernel
+        ])
+        for T in unique_Ts
+    }
+    params.L = {
+        T: jnp.linalg.cholesky(K)
+        for T, K in params.K.items()
+    }
+    params.logdet = {
+        T: jnp.log(L.diagonal(axis1=-2, axis2=-1)).sum(-1) * 2
+        for T, L in params.L.items()
+    }
 
-        self.params.L = {
-            T: jnp.linalg.cholesky(K)
-            for T, K in self.params.K.items()
-        }
-        self.params.logdet = {
-            T: jnp.log(L.diagonal(axis1=-2, axis2=-1)).sum(-1) * 2
-            for T, L in self.params.L.items()
-        }
+    # init trials
+    typer.echo('Initializing')
+    preprocess(session, params, initialize=fa.transform)
+    if params.EM.fast:
+        preprocess(em_session, params, initialize=fa.transform)
+    typer.secho('Initialized', fg=typer.colors.GREEN, bold=True)
+    return session, params, em_session
 
-        # init trials
-        typer.echo('Initializing')
-        preprocess(self.session, self.params, initialize=fa.transform)
-        if self.params.EM.fast:
-            preprocess(self.em_session, self.params, initialize=fa.transform)
-        typer.secho('Initialized', fg=typer.colors.GREEN, bold=True)
 
-    def fit(self, *, max_iter: int = 50):
-        loss = jnp.inf
+def fit(session: Session, n_factors: int, kernel: Union[Callable, Sequence[Callable]],
+        *, max_iter: int = 50, fast_em=True, T_em=100):
+    params = Params(n_factors, kernel)
+    params.EM.fast = fast_em
+    params.EM.trial_length = T_em
+    session, params, em_session = init(session, params)
 
-        try:
-            for i in range(max_iter):
-                tick = time.perf_counter()
-                mstep(self.em_session, self.params)
-                tock = time.perf_counter()
-                m_elapsed = tock - tick
+    loss = jnp.inf
+    try:
+        for i in range(max_iter):
+            tick = time.perf_counter()
+            mstep(em_session, params)
+            tock = time.perf_counter()
+            m_elapsed = tock - tick
 
-                tick = time.perf_counter()
-                new_loss = estep(self.em_session, self.params)
-                tock = time.perf_counter()
-                e_elapsed = tock - tick
+            tick = time.perf_counter()
+            new_loss = estep(em_session, params)
+            tock = time.perf_counter()
+            e_elapsed = tock - tick
 
-                typer.echo(f'EM Iteration {i + 1}, \tLoss = {new_loss:.4f}, \t'
-                           f'M step: {m_elapsed:.2f}s, \t'
-                           f'E step: {e_elapsed:.2f}s')
+            typer.echo(f'EM Iteration {i + 1}, \tLoss = {new_loss:.4f}, \t'
+                       f'M step: {m_elapsed:.2f}s, \t'
+                       f'E step: {e_elapsed:.2f}s')
 
-                if jnp.isnan(new_loss):
-                    typer.secho('EM stopped at NaN loss.',
-                                fg=typer.colors.WHITE,
-                                bg=typer.colors.RED,
-                                err=True)
-                    break
-                if jnp.isclose(loss, new_loss):
-                    typer.echo('EM stopped at convergence.')
-                    break
-                if new_loss > loss:
-                    typer.echo('EM stopped at increasing loss.')
-                    break
+            if jnp.isnan(new_loss):
+                typer.secho('EM stopped at NaN loss.',
+                            fg=typer.colors.WHITE,
+                            bg=typer.colors.RED,
+                            err=True)
+                break
+            if jnp.isclose(loss, new_loss):
+                typer.echo('EM stopped at convergence.')
+                break
+            if new_loss > loss:
+                typer.echo('EM stopped at increasing loss.')
+                break
 
-                loss = new_loss
-        except KeyboardInterrupt:
-            typer.echo('Aborted')
+            loss = new_loss
+    except KeyboardInterrupt:
+        typer.echo('Aborted')
 
-        typer.echo('Inferring')
-        estep(self.session, self.params, verbose=True)
-        typer.secho('Finished', fg=typer.colors.GREEN, bold=True)
+    typer.echo('Inferring')
+    estep(session, params, verbose=True)
+    typer.secho('Finished', fg=typer.colors.GREEN, bold=True)
 
-        return self
-
-    def save(self, path):
-        with open(path, 'wb') as file:
-            pickle.dump(self, file)
-
-    @classmethod
-    def load(cls, path):
-        with open(path, 'rb') as file:
-            model = pickle.load(file)
-        return model
+    return session, params

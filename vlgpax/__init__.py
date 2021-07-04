@@ -1,2 +1,2 @@
 from .model import Session
-from .vi import vLGP
+from .vi import *
