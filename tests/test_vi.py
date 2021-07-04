@@ -1,4 +1,5 @@
 import math
+import tempfile
 
 from jax import numpy as jnp
 
@@ -21,3 +22,8 @@ def test_inference():
                      T_em=T_em)
     assert inference.params.K[T].shape == (n_factors, T, T)
     assert inference.params.C.shape == (n_factors + 1, N)
+
+    fd, path = tempfile.mkstemp()
+    inference.save(path)
+    model = vLGP.load(path)
+    assert isinstance(model, vLGP)

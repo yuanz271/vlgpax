@@ -22,6 +22,7 @@
 # L: Array(M, T, T), K = LL'
 # V: Array(M, T, T), posterior covariance
 ######################
+import pickle
 import random
 import time
 from collections.abc import Iterable
@@ -345,3 +346,13 @@ class vLGP:
         typer.secho('Finished', fg=typer.colors.GREEN, bold=True)
 
         return self
+
+    def save(self, path):
+        with open(path, 'wb') as file:
+            pickle.dump(self, file)
+
+    @classmethod
+    def load(cls, path):
+        with open(path, 'rb') as file:
+            model = pickle.load(file)
+        return model
