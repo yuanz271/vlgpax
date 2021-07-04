@@ -1,6 +1,7 @@
 import numpy as np
-from jax import numpy as jnp, scipy as jsp
+from jax import numpy as jnp
 
+from context import vlgpax
 from vlgpax.util import batch_lstsq, cholesky_solve
 
 

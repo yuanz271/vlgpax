@@ -1,6 +1,7 @@
 import jax
 from jax import numpy as jnp
 
+from context import vlgpax
 from vlgpax import kernel
 
 
