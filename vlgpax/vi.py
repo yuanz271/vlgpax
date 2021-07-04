@@ -22,6 +22,7 @@
 # L: Array(M, T, T), K = LL'
 # V: Array(M, T, T), posterior covariance
 ######################
+import random
 import time
 from collections import Iterable
 from typing import Union, Sequence, Callable
@@ -238,6 +239,7 @@ class vLGP:
                  *,
                  T_split=100,
                  fast_em=True):
+        self.key = jax.random.PRNGKey(int(random.random() * 10))
         self.session = session
         self.params = Params(n_factors)
         self.params.algo['T_split'] = T_split
@@ -266,7 +268,8 @@ class vLGP:
 
         # init params
         if self.params.C is None:
-            self.params.C = jnp.zeros((n_factors + n_regressors, n_channels))
+            self.params.C = jax.random.normal(self.key, (n_factors + n_regressors, n_channels)) / \
+                            jnp.sqrt((n_factors + n_regressors) * n_channels)
 
         # init kernels
         # a space efficient way of storing kernel matrices
