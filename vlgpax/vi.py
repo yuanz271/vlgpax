@@ -24,7 +24,7 @@
 ######################
 import random
 import time
-from collections import Iterable
+from collections.abc import Iterable
 from typing import Union, Sequence, Callable
 
 import jax
