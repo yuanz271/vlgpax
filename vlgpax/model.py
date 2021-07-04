@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Any, Optional, List
+from typing import Any, Optional, List, Callable, Iterable
 
 from jax import numpy as jnp
 
@@ -21,11 +21,16 @@ class EMParams:
 @dataclass
 class Params:
     n_factors: int
+    kernel: Iterable [Callable] = None
     C: Optional[Any] = None  # (n_factors + n_regressors, n_channels)
     K: Optional[Any] = None  # (n_factors, T, T)
     L: Optional[Any] = None  # (n_factors, T, T)
     logdet: Optional[Any] = None  # (n_factors, T)
     EM: EMParams = field(default=EMParams(), repr=False, init=False)  # EM algorithm settings
+
+    def __post_init__(self):
+        if isinstance(self.kernel, Callable):
+            self.kernel = [self.kernel] * self.n_factors
 
 
 @dataclass
