@@ -240,7 +240,7 @@ class vLGP:
                  fast_em=True,
                  T_em=100,
                  ):
-        self.key = jax.random.PRNGKey(int(random.random() * 10))
+        self.key = jax.random.PRNGKey(random.getrandbits(32))  # 32bit
         self.session = session
         self.params = Params(n_factors)
         self.params.EM.fast = fast_em
