@@ -38,12 +38,10 @@ from .data import Session, Params
 from .util import diag_embed, capped_exp, cholesky_solve
 
 __all__ = ['vLGP', 'reconstruct_cov']
-default_clip = 3.
-default_eps = 1e-6
 
 
 @jax.jit
-def reconstruct_cov(K, w, eps: float = default_eps):
+def reconstruct_cov(K, w, eps: float = 1e-6):
     invw = 1. / w
     # assert jnp.all(invw > 0.)
     invW = diag_embed(invw.T)  # (zdim, T, T)
