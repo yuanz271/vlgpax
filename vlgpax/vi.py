@@ -37,7 +37,7 @@ from sklearn.decomposition import FactorAnalysis
 from .data import Session, Params
 from .util import diag_embed, capped_exp, cholesky_solve
 
-__all__ = ['vLGP']
+__all__ = ['vLGP', 'reconstruct_cov']
 default_clip = 3.
 default_eps = 1e-6
 
