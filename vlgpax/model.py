@@ -9,6 +9,18 @@ __all__ = ['Session', 'Params']
 
 @dataclass
 class EMParams:
+    """
+    Settings for VEM algorithm
+    :attributes
+        max_iter: outer # iterations
+        e_max_iter: E step # iterations
+        m_max_iter: M step # iterations
+        fast: flag of fast EM, only meaningful for stationary kernels
+        trial_length: trial length for fast EM, cut trials shorter ones
+        clip: value for clipping newton step
+        eps: small positive value for numerical stability
+        stepsize: stepsize for damped newton's method
+    """
     max_iter: int = 50
     e_max_iter: int = 50
     m_max_iter: int = 50
@@ -21,6 +33,16 @@ class EMParams:
 
 @dataclass
 class Params:
+    """
+    Parameters and settings for vLGP
+    :attributes
+        n_factors: # of latent factors
+        C: loading matrix, (n_factors + n_regressors, n_channels)
+        K: list of kernel matrices, (n_factors, T, T) each
+        L: K = LL', (n_factors, T, T)
+        logdet: log determinants of K's, (n_factors, T)
+        EM: settings of EM
+    """
     n_factors: int
     kernel: Iterable[Callable] = None
     C: Optional[Any] = None  # (n_factors + n_regressors, n_channels)
@@ -85,6 +107,14 @@ class Session:
     compact: bool = field(default=True, repr=False, init=False)
 
     def add_trial(self, tid, y, x=None, t=None):
+        """
+        Add a trial to the session
+        :param tid: trial's unique identifier
+        :param y: binned spike train, (T, n_neurons)
+        :param x: design matrix, (T, n_regressors)
+        :param t: timing of each bin, (T,)
+        :return:
+        """
         trial = Trial(tid, y, x, t)
         if self.trials:
             assert self.trials[0].is_consistent_with(trial)

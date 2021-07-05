@@ -41,6 +41,14 @@ __all__ = ['fit', 'reconstruct_cov']
 
 @jax.jit
 def reconstruct_cov(K, w, eps: float = 1e-6):
+    """
+    Reconstruct posterior covariance matrices of a trial
+    :param K: kernel matrices, (n_factors, T, T)
+    :param w: w matrix in the trial, (T, n_factors)
+    :param eps: small positive value
+    :return:
+        V: posterior covariance matrices, (n_factors, T, T)
+    """
     invw = 1. / w
     # assert jnp.all(invw > 0.)
     invW = diag_embed(invw.T)  # (zdim, T, T)
@@ -54,7 +62,26 @@ def reconstruct_cov(K, w, eps: float = 1e-6):
 
 
 @jax.jit
-def e_loss_newton(y, Cx, Cz, x, z, v, K, L, logdet, eps: float):
+def e_loss_newton(y, Cz, Cx, z, x, v, K, L, logdet, eps: float):
+    """
+    Trialwise loss function and newton update for E step
+    :param y: spike train
+    :param Cz: loading matrix corresponding to latent factors, (n_factors, n_neurons)
+    :param Cx: loading matrix corresponding to regressors, (n_regressors, n_neurons)
+    :param z: latent factors, (T, n_factors)
+    :param x: design matrix, (T, n_regressors)
+    :param v: posterior variances, (T, n_factors)
+    :param K: kernel matrices
+    :param L: kernel square roots
+    :param logdet: kernel log determinants
+    :param eps: small positive value
+    :return:
+        loss: loss at current parameters and factors
+        delta: newton update
+        v: current v
+        w: current w
+        lam: quantity for convergence check, grad' H^{-1} grad
+    """
     u = v @ (Cz**2)
     lnr = x @ Cx + z @ Cz
     r = capped_exp(lnr + 0.5 * u)  # [x, z] C
@@ -84,7 +111,12 @@ def e_loss_newton(y, Cx, Cz, x, z, v, K, L, logdet, eps: float):
     return loss, delta, v, w, lam
 
 
-def invalid(delta):
+def invalid(delta) -> bool:
+    """
+    Check update
+    :param delta: newton update
+    :return:
+    """
     return jnp.any(jnp.isnan(delta)) or jnp.any(jnp.isinf(delta))
 
 
@@ -114,8 +146,7 @@ def estep(session: Session,
 
         loss = np.nan
         for i in range(max_iter):
-            loss, delta, v, w, lam = e_loss_newton(y, Cx, Cz, x, z, v, K, L,
-                                                   logdet, eps)
+            loss, delta, v, w, lam = e_loss_newton(y, Cz, Cx, z, x, v, K, L, logdet, eps)
 
             # if jnp.isclose(loss, new_loss):
             #     break
@@ -285,15 +316,15 @@ def init(session, params):
 
 
 def fit(session: Session, n_factors: int, kernel: Union[Callable, Sequence[Callable]],
-        *, max_iter: int = 50, fast_em=True, T_em=100):
+        *, EM_args=None):
     params = Params(n_factors, kernel)
-    params.EM.fast = fast_em
-    params.EM.trial_length = T_em
+    if isinstance(EM_args, dict):
+        vars(params.EM).update(EM_args)
     session, params, em_session = init(session, params)
 
     loss = jnp.inf
     try:
-        for i in range(max_iter):
+        for i in range(params.EM.max_iter):
             tick = time.perf_counter()
             mstep(em_session, params)
             tock = time.perf_counter()
