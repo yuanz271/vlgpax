@@ -30,16 +30,29 @@ Learn how to use it in the [example](script/example.py).
   - `z` posterior mean
   - `v` posterior variances
 - `Session` A container of trials
-  - `trials` list of `Trial`s
-  - `binsize` binwidth if evenly-spaced timing
+  - `trials` list of `Trial`
+  - `binsize` binwidth if evenly spaced
 - `Params` Parameters
   - `n_factors` number of latent factors
-  - `C` loading matrix and bias, (n_factors + n_regressors, n_neurons)
+  - `C` loading matrix, (n_factors + n_regressors, n_neurons)
   - `K` kernel matrices
-- `vLGP` Wrapper of algorithm
-  - `session` Session
-  - `params` Params
-  - `kernel` kernel functions
+
+### Training
+```python
+from vlgpax import Session, vi
+from vlgpax.kernel import RBF
+
+binsize = 1e-2
+session = Session(binsize)
+# Add trials to the session
+# session.add_trial(tid=1, y=y)  # ID, spike train, ...
+# ...
+
+# Kernel function k(x, y) = scale * exp(-0.5 ||x/lengthscale - y/lengthsale||^2)
+kernel = RBF(scale=1., lengthscale=100.)  # lengthscale has the same unit as that of binsize
+
+session, params = vi.fit(session, n_factors=2, kernel=kernel)
+```
     
 ## Citation
 ```
