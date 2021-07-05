@@ -53,7 +53,7 @@ kernel = RBF(scale=1., lengthscale=100.)  # lengthscale has the same unit as tha
 
 session, params = vi.fit(session, n_factors=2, kernel=kernel)
 ```
-    
+
 ## Citation
 ```
 @Article{Zhao2017,
