@@ -153,8 +153,8 @@ def estep(session: Session,
             if jnp.isclose(0.5 * lam, 0.):
                 break
 
-            if jnp.any(jnp.abs(delta) > clip):
-                typer.echo(f'E: large update detected', err=True)
+            # if jnp.any(jnp.abs(delta) > clip):
+            #     typer.echo(f'E: large update detected', err=True)
             delta = jnp.clip(delta, a_min=-clip, a_max=clip)
             if invalid(delta):
                 break
@@ -218,8 +218,8 @@ def mstep(session: Session,
         if jnp.isclose(0.5 * lam, 0.):
             break
 
-        if jnp.any(jnp.abs(delta) > clip):
-            typer.echo(f'M: large update detected', err=True)
+        # if jnp.any(jnp.abs(delta) > clip):
+        #     typer.echo(f'M: large update detected', err=True)
         delta = jnp.clip(delta, a_min=-clip, a_max=clip)
         if invalid(delta):
             break

@@ -10,7 +10,7 @@ from vlgpax import vi
 
 from jax.config import config
 
-config.update('jax_enable_x64', True)  # use 64bit float
+# config.update('jax_enable_x64', True)  # use 64bit float
 
 
 def main():
