@@ -12,8 +12,11 @@ from jax.config import config
 
 # config.update('jax_enable_x64', True)  # use 64bit float
 
+random_seed = 0
+
 
 def main():
+    np.random.seed(random_seed)
     # %% Generate 2D sine wave latent trajectory
     dt = 2 * math.pi * 2e-3  # stepsize
     T = 5000  # length
@@ -54,7 +57,7 @@ def main():
     kernel = RBF(scale=1., lengthscale=100 * dt)  # RBF kernel
     # key = jax.random.PRNGKey(0)
     # kernel = RFF(key, 50, 1, scale=1., lengthscale=100 * dt)
-    session, params = vi.fit(session, n_factors=2, kernel=kernel)
+    session, params = vi.fit(session, n_factors=2, kernel=kernel, seed=random_seed)
     # `fit` requires the target `session`, the number of factors `n_factors`, and the `kernel` function.
     # `kernel` is a kernel function or a list of them corresponding to the factors.
     # RBF kernel is implemented in `gp.kernel`. You may write your own kernels.

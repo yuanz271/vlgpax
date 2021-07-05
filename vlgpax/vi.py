@@ -263,7 +263,9 @@ def make_em_session(session: Session, T: int) -> Session:
 
 def init(session, params):
     assert session.trials
-    key = jax.random.PRNGKey(random.getrandbits(32))
+    if params.seed is None:
+        params.seed = random.getrandbits(32)
+    key = jax.random.PRNGKey(params.seed)
 
     trial = session.trials[0]
     n_channels = trial.y.shape[-1]
@@ -316,8 +318,8 @@ def init(session, params):
 
 
 def fit(session: Session, n_factors: int, kernel: Union[Callable, Sequence[Callable]],
-        *, EM_args=None):
-    params = Params(n_factors, kernel)
+        *, EM_args=None, seed=None):
+    params = Params(n_factors, kernel, seed=seed)
     if isinstance(EM_args, dict):
         vars(params.EM).update(EM_args)
     session, params, em_session = init(session, params)

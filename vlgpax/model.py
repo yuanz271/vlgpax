@@ -49,6 +49,7 @@ class Params:
     K: Optional[Any] = None  # (n_factors, T, T)
     L: Optional[Any] = None  # (n_factors, T, T)
     logdet: Optional[Any] = None  # (n_factors, T)
+    seed: Optional[int] = None  # random seed for reproducibility
     EM: EMParams = field(default=EMParams(), repr=False, init=False)  # EM algorithm settings
 
     def __post_init__(self):
