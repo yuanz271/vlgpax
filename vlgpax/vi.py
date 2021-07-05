@@ -36,7 +36,7 @@ from sklearn.decomposition import FactorAnalysis
 from .model import Session, Params
 from .util import diag_embed, capped_exp, cholesky_solve
 
-__all__ = ['fit', 'reconstruct_cov']
+__all__ = ['fit', 'infer', 'reconstruct_cov']
 
 
 @jax.jit
@@ -363,3 +363,8 @@ def fit(session: Session, n_factors: int, kernel: Union[Callable, Sequence[Calla
     typer.secho('Finished', fg=typer.colors.GREEN, bold=True)
 
     return session, params
+
+
+def infer(session, params) -> Session:
+    estep(session, params, verbose=True)
+    return session
