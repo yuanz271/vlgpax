@@ -277,7 +277,7 @@ def init(session, params):
     else:
         em_session = session
 
-    fa = FactorAnalysis(n_components=params.n_factors)
+    fa = FactorAnalysis(n_components=params.n_factors, random_state=params.seed)
     y = session.y
     fa = fa.fit(y)
 
