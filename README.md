@@ -69,9 +69,3 @@ session, params = vi.fit(session, n_factors=2, kernel=kernel)
   publisher = {{MIT} Press - Journals},
 }
 ```
-
-## Changes
-
-2021
-
-- port to JAX
