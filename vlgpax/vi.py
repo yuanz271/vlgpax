@@ -124,10 +124,10 @@ def estep(session: Session,
           params: Params,
           *,
           verbose: bool = False) -> float:
-    max_iter = params.EM.e_max_iter
-    clip = params.EM.clip
-    eps = params.EM.eps
-    stepsize = params.EM.stepsize
+    max_iter = params.args.e_max_iter
+    clip = params.args.clip
+    eps = params.args.eps
+    stepsize = params.args.stepsize
 
     zdim = params.n_factors
     C = params.C  # (zdim + xdim, ydim)
@@ -196,10 +196,10 @@ def m_loss_newton(y, C, Cz, M, v):
 
 def mstep(session: Session,
           params: Params):
-    max_iter = params.EM.m_max_iter
-    clip = params.EM.clip
+    max_iter = params.args.m_max_iter
+    clip = params.args.clip
     # eps = params.EM.eps
-    stepsize = params.EM.stepsize
+    stepsize = params.args.stepsize
 
     zdim = params.n_factors
     C = params.C  # (zdim + xdim, ydim)
@@ -272,8 +272,8 @@ def init(session, params):
     n_regressors = trial.x.shape[-1]
     n_factors = params.n_factors
 
-    if params.EM.fast:
-        em_session = make_em_session(session, params.EM.trial_length)
+    if params.args.fast:
+        em_session = make_em_session(session, params.args.trial_length)
     else:
         em_session = session
 
@@ -290,7 +290,7 @@ def init(session, params):
     # a space efficient way of storing kernel matrices
     # less efficient if many trials are of distinct length
     unique_Ts = np.unique([trial.T for trial in session.trials] +
-                          [params.EM.trial_length])
+                          [params.args.trial_length])
     params.K = {
         T: jnp.stack([
             k(
@@ -311,7 +311,7 @@ def init(session, params):
     # init trials
     typer.echo('Initializing')
     preprocess(session, params, initialize=fa.transform)
-    if params.EM.fast:
+    if params.args.fast:
         preprocess(em_session, params, initialize=fa.transform)
     typer.secho('Initialized', fg=typer.colors.GREEN, bold=True)
     return session, params, em_session
@@ -321,12 +321,12 @@ def fit(session: Session, n_factors: int, kernel: Union[Callable, Sequence[Calla
         *, EM_args=None, seed=None):
     params = Params(n_factors, kernel, seed=seed)
     if isinstance(EM_args, dict):
-        vars(params.EM).update(EM_args)
+        vars(params.args).update(EM_args)
     session, params, em_session = init(session, params)
 
     loss = jnp.inf
     try:
-        for i in range(params.EM.max_iter):
+        for i in range(params.args.max_iter):
             tick = time.perf_counter()
             mstep(em_session, params)
             tock = time.perf_counter()
