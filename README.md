@@ -25,7 +25,7 @@ Learn how to use it in the [example](script/example.py).
 ### Data structure
 - `Trial` A single trial
   - `y` spike train
-  - `x` regressors
+  - `x` design matrix of regressors, see [pyneuroglm](https://github.com/yuanz271/pyneuroglm) for building design matrix
   - `t` timing of bins
   - `z` posterior mean
   - `v` posterior variances
@@ -36,6 +36,7 @@ Learn how to use it in the [example](script/example.py).
   - `n_factors` number of latent factors
   - `C` loading matrix, (n_factors + n_regressors, n_neurons)
   - `K` kernel matrices
+  - `args` algorithm settings
 
 ### Training
 ```python
@@ -45,7 +46,7 @@ from vlgpax.kernel import RBF
 binsize = 1e-2
 session = Session(binsize)
 # Add trials to the session
-# session.add_trial(tid=1, y=y)  # ID, spike train, ...
+session.add_trial(tid=1, y=y)  # ID, spike train, ...
 # ...
 
 # Kernel function k(x, y) = scale * exp(-0.5 ||x/lengthscale - y/lengthsale||^2)
