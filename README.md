@@ -26,7 +26,7 @@ Learn how to use it in the [example](script/example.py).
 - `Trial` A single trial
   - `y` spike train
   - `x` design matrix of regressors, see [pyneuroglm](https://github.com/yuanz271/pyneuroglm) for building design matrix
-  - `t` timing of bins
+  - `t` timing of bins, useful for unevenly spaced timing and nonstationary kernels
   - `z` factor posterior mean
   - `v` factor posterior variances
 - `Session` A container of trials
