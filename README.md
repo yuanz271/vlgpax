@@ -27,8 +27,8 @@ Learn how to use it in the [example](script/example.py).
   - `y` spike train
   - `x` design matrix of regressors, see [pyneuroglm](https://github.com/yuanz271/pyneuroglm) for building design matrix
   - `t` timing of bins
-  - `z` posterior mean
-  - `v` posterior variances
+  - `z` factor posterior mean
+  - `v` factor posterior variances
 - `Session` A container of trials
   - `trials` list of `Trial`
   - `binsize` binwidth if evenly spaced
