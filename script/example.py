@@ -8,9 +8,6 @@ from vlgpax.model import Session
 from vlgpax.kernel import RBF, RFF
 from vlgpax import vi
 
-from jax.config import config
-
-config.update('jax_enable_x64', True)  # use 64bit float
 
 random_seed = 0
 
