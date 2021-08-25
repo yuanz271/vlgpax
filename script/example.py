@@ -54,7 +54,7 @@ def main():
     kernel = RBF(scale=1., lengthscale=100 * dt)  # RBF kernel
     # key = jax.random.PRNGKey(0)
     # kernel = RFF(key, 50, 1, scale=1., lengthscale=100 * dt)
-    session, params = vi.fit(session, n_factors=2, kernel=kernel, seed=random_seed)
+    session, params = vi.fit(session, n_factors=2, kernel=kernel, seed=random_seed, max_iter=50)
     # `fit` requires the target `session`, the number of factors `n_factors`, and the `kernel` function.
     # `kernel` is a kernel function or a list of them corresponding to the factors.
     # RBF kernel is implemented in `gp.kernel`. You may write your own kernels.
