@@ -318,10 +318,10 @@ def init(session, params):
 
 
 def fit(session: Session, n_factors: int, kernel: Union[Callable, Sequence[Callable]],
-        *, EM_args=None, seed=None):
+        *, seed=None, **kwargs):
     params = Params(n_factors, kernel, seed=seed)
-    if isinstance(EM_args, dict):
-        vars(params.args).update(EM_args)
+    if isinstance(kwargs, dict):
+        vars(params.args).update(kwargs)
     session, params, em_session = init(session, params)
 
     loss = jnp.inf
