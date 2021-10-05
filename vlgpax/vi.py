@@ -314,6 +314,9 @@ def init(session, params):
     if params.args.fast:
         preprocess(em_session, params, initialize=fa.transform)
     typer.secho('Initialized', fg=typer.colors.GREEN, bold=True)
+
+    params.initialize = fa.transform
+
     return session, params, em_session
 
 
@@ -366,5 +369,6 @@ def fit(session: Session, n_factors: int, kernel: Union[Callable, Sequence[Calla
 
 
 def infer(session, params) -> Session:
+    preprocess(session, params, params.initialize)
     estep(session, params, verbose=True)
     return session

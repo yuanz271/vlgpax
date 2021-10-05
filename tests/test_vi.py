@@ -22,3 +22,11 @@ def test_inference():
                              T_em=T_em)
     assert params.K[T].shape == (n_factors, T, T)
     assert params.C.shape == (n_factors + 1, N)
+    
+
+    # infer
+    session = Session(1)
+    session.add_trial(1, jnp.zeros((T, N)))
+    session.add_trial(2, jnp.zeros((T, N)))
+
+    vi.infer(session, params)
