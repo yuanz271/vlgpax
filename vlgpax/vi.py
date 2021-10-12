@@ -194,6 +194,49 @@ def m_loss_newton(y, C, Cz, M, v):
     return loss, delta, lam
 
 
+@jax.jit
+def trial_m_loss_newton(y, C, Cz, M, v):
+    u = v @ (Cz**2)
+    lnr = M @ C
+    r = capped_exp(lnr + 0.5 * u)
+    loss = jnp.mean(jnp.sum(r - y * lnr, axis=-1))
+
+    R = diag_embed(r.T)  # (ydim, T, T)
+    # Newton update
+    g = (r - y).T @ M  # (ydim, zdim + xdim)
+    H = jnp.expand_dims(M.T, 0) @ R @ jnp.expand_dims(
+        M, 0)  # (ydim, zdim + xdim, zdim + xdim)
+    # assert jnp.all(H.diagonal(axis1=-2, axis2=-1) > 0.)
+
+    return loss, g, H
+
+
+def session_m_loss_newton(session, C, Cz):
+    loss = 0.
+    g = 0.
+    H = 0.
+    s = 0
+    for trial in session.trials:
+        y = trial.y
+        x = trial.x
+        z = trial.z
+        v = trial.v
+        M = jnp.column_stack((z, x))
+        s += np.prod(M.shape)
+
+        loss_i, g_i, H_i = trial_m_loss_newton(y, C, Cz, M, v)
+        loss += loss_i
+        g += g_i
+        H += H_i
+
+        # assert jnp.all(H.diagonal(axis1=-2, axis2=-1) > 0.)
+    g_div_H = solve(H, jnp.expand_dims(g, -1))
+    delta = jnp.squeeze(g_div_H, -1).T  # (ydim, ?, 1)
+    lam = jnp.sum(jnp.expand_dims(g, 1) @ g_div_H) / s
+
+    return loss, delta, lam
+
+
 def mstep(session: Session,
           params: Params):
     max_iter = params.args.m_max_iter
@@ -205,15 +248,16 @@ def mstep(session: Session,
     C = params.C  # (zdim + xdim, ydim)
 
     # concat trials
-    y = session.y
-    x = session.x
-    z = session.z
-    v = session.v
-    M = jnp.column_stack((z, x))
+    # y = session.y
+    # x = session.x
+    # z = session.z
+    # v = session.v
+    # M = jnp.column_stack((z, x))
 
     loss = jnp.nan
     for i in range(max_iter):
-        loss, delta, lam = m_loss_newton(y, C, C[:zdim, :], M, v)
+        # loss, delta, lam = m_loss_newton(y, C, C[:zdim, :], M, v)
+        loss, delta, lam = session_m_loss_newton(session, C, C[:zdim, :])
 
         if jnp.isclose(0.5 * lam, 0.):
             break
