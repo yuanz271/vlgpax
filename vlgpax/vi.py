@@ -405,7 +405,7 @@ def fit(session: Session, n_factors: int, kernel: Union[Callable, Sequence[Calla
             if new_loss > loss:
                 warnings.warn('EM: increasing loss')
                 # typer.echo('EM stopped at increasing loss.')
-                # break
+                break
 
             loss = new_loss
     except KeyboardInterrupt:
