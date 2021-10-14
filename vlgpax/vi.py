@@ -25,6 +25,7 @@
 import random
 import time
 from typing import Union, Sequence, Callable
+import warnings
 
 import jax
 import numpy as np
@@ -161,7 +162,9 @@ def estep(session: Session,
 
             z = z - stepsize * delta
         else:
-            typer.echo(f'E: maximum number of iterations reached', err=True)
+            warnings.warn(f'E: maximum number of iterations reached')
+            # typer.echo(f'E: maximum number of iterations reached', err=True)
+            pass
 
         trial.z = z
         trial.v = v
@@ -270,7 +273,9 @@ def mstep(session: Session,
 
         C = C - stepsize * delta
     else:
-        typer.echo(f'M: maximum number of iterations reached', err=True)
+        warnings.warn(f'M: maximum number of iterations reached')
+        # typer.echo(f'M: maximum number of iterations reached', err=True)
+        pass
 
     params.C = C
     return loss
@@ -398,8 +403,9 @@ def fit(session: Session, n_factors: int, kernel: Union[Callable, Sequence[Calla
                 typer.echo('EM stopped at convergence.')
                 break
             if new_loss > loss:
-                typer.echo('EM stopped at increasing loss.')
-                break
+                warnings.warn('EM: increasing loss')
+                # typer.echo('EM stopped at increasing loss.')
+                # break
 
             loss = new_loss
     except KeyboardInterrupt:
