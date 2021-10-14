@@ -22,8 +22,8 @@ class Args:
         stepsize: stepsize for damped newton's method
     """
     max_iter: int = 50
-    e_max_iter: int = 50
-    m_max_iter: int = 50
+    e_max_iter: int = 20
+    m_max_iter: int = 20
     fast: bool = True
     trial_length: int = 100
     clip: float = 3.

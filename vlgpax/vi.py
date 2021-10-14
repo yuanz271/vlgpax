@@ -37,6 +37,7 @@ from sklearn.decomposition import FactorAnalysis
 from .model import Session, Params
 from .util import diag_embed, capped_exp, cholesky_solve
 
+
 __all__ = ['fit', 'infer', 'reconstruct_cov']
 
 
@@ -147,23 +148,23 @@ def estep(session: Session,
 
         loss = np.nan
         for i in range(max_iter):
-            loss, delta, v, w, lam = e_loss_newton(y, Cz, Cx, z, x, v, K, L, logdet, eps)
+            new_loss, delta, v, w, lam = e_loss_newton(y, Cz, Cx, z, x, v, K, L, logdet, eps)
 
-            # if jnp.isclose(loss, new_loss):
-            #     break
             if jnp.isclose(0.5 * lam, 0.):
                 break
 
-            # if jnp.any(jnp.abs(delta) > clip):
-            #     typer.echo(f'E: large update detected', err=True)
+            if new_loss > loss:
+                warnings.warn('E: increasing loss')
+                # break
+
             delta = jnp.clip(delta, a_min=-clip, a_max=clip)
             if invalid(delta):
                 break
 
+            loss = new_loss
             z = z - stepsize * delta
         else:
             warnings.warn(f'E: maximum number of iterations reached')
-            # typer.echo(f'E: maximum number of iterations reached', err=True)
             pass
 
         trial.z = z
@@ -260,21 +261,23 @@ def mstep(session: Session,
     loss = jnp.nan
     for i in range(max_iter):
         # loss, delta, lam = m_loss_newton(y, C, C[:zdim, :], M, v)
-        loss, delta, lam = session_m_loss_newton(session, C, C[:zdim, :])
+        new_loss, delta, lam = session_m_loss_newton(session, C, C[:zdim, :])
 
         if jnp.isclose(0.5 * lam, 0.):
             break
 
-        # if jnp.any(jnp.abs(delta) > clip):
-        #     typer.echo(f'M: large update detected', err=True)
+        if new_loss > loss:
+            warnings.warn('M: increasing loss')
+            # break
+
         delta = jnp.clip(delta, a_min=-clip, a_max=clip)
         if invalid(delta):
             break
 
+        loss = new_loss
         C = C - stepsize * delta
     else:
         warnings.warn(f'M: maximum number of iterations reached')
-        # typer.echo(f'M: maximum number of iterations reached', err=True)
         pass
 
     params.C = C
@@ -336,8 +339,6 @@ def init(session, params):
                         jnp.sqrt((n_factors + n_regressors) * n_channels)
 
     # init kernels
-    # a space efficient way of storing kernel matrices
-    # less efficient if many trials are of distinct length
     unique_Ts = np.unique([trial.T for trial in session.trials] +
                           [params.args.trial_length])
     params.K = {
@@ -394,18 +395,17 @@ def fit(session: Session, n_factors: int, kernel: Union[Callable, Sequence[Calla
                        f'E step: {e_elapsed:.2f}s')
 
             if jnp.isnan(new_loss):
-                typer.secho('EM stopped at NaN loss.',
+                typer.secho('EM: stopped at NaN loss',
                             fg=typer.colors.WHITE,
                             bg=typer.colors.RED,
                             err=True)
                 break
             if jnp.isclose(loss, new_loss):
-                typer.echo('EM stopped at convergence.')
+                typer.echo('EM: stopped at convergence')
                 break
             if new_loss > loss:
                 warnings.warn('EM: increasing loss')
-                # typer.echo('EM stopped at increasing loss.')
-                break
+                # break
 
             loss = new_loss
     except KeyboardInterrupt:
