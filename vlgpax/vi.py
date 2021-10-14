@@ -154,8 +154,8 @@ def estep(session: Session,
                 break
 
             if new_loss > loss:
-                warnings.warn('E: increasing loss')
-                # break
+                warnings.warn('E: loss increased')
+                break
 
             delta = jnp.clip(delta, a_min=-clip, a_max=clip)
             if invalid(delta):
@@ -267,8 +267,8 @@ def mstep(session: Session,
             break
 
         if new_loss > loss:
-            warnings.warn('M: increasing loss')
-            # break
+            warnings.warn('M: loss increased')
+            break
 
         delta = jnp.clip(delta, a_min=-clip, a_max=clip)
         if invalid(delta):
@@ -404,8 +404,8 @@ def fit(session: Session, n_factors: int, kernel: Union[Callable, Sequence[Calla
                 typer.echo('EM: stopped at convergence')
                 break
             if new_loss > loss:
-                warnings.warn('EM: increasing loss')
-                # break
+                warnings.warn('EM: loss increased')
+                break
 
             loss = new_loss
     except KeyboardInterrupt:
