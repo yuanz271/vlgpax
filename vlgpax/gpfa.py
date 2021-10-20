@@ -85,26 +85,6 @@ def em(y, x, z, C, R, K, max_iter):
         Cx = C[zdim:, :]
         bigR = jnp.kron(jnp.eye(n), R)
         z = estep(y, x, Cz, Cx, bigK, bigR)
-        # zx = jnp.concatenate((z, x), axis=-1)
-        # Z = zx.reshape(-1, zx.shape[-1])
-        # r = jnp.mean(Y - Z @ C, axis=0)
-        # R = jnp.diag(r ** 2)
-        # bigC = jnp.kron(Cz.T, jnp.eye(n))
-        # A = bigK @ bigC.T
-        # B = bigC @ A + bigR
-        # residual = y - x @ Cx
-        # residual = residual.transpose((0, 2, 1)).reshape(m, -1, 1)
-
-        # z = A[None, ...] @ solve(B[None, ...], residual)
-        # z = z.reshape(m, zdim, -1).transpose((0, 2, 1))
-        # z = z - z.mean(axis=(0, 1), keepdims=True)
-
-        # M step
-        # zx = jnp.concatenate((z, x), axis=-1)
-        # Z = zx.reshape(-1, zdim + xdim)
-        # C, r = leastsq(Y, Z)  # Y = Z C
-        # R = jnp.diag(r ** 2)
-        # C = C / jnp.linalg.norm(C)
         C, _ = mstep(z, x, Y)
 
         d = jnp.linalg.norm(C - old_C) / (p * ydim)
@@ -154,23 +134,9 @@ def infer(session, params):
     Cz = C[:zdim, :]
     Cx = C[zdim:, :]
     for i, trial in enumerate(trials):        
-        # n, ydim = trial.y.shape
-        # _, zdim = trial.z.shape
-
         y = jnp.sqrt(trial.y)
         x = trial.x
-        # z = trial.z
 
         z = single_trial_estep(y, x, Cz, Cx, R, trial.K[0])
 
-        # y = y - x @ Cx
-        # y = y.T.reshape(-1, 1)
-        # bigC = jnp.kron(Cz.T, jnp.eye(n))
-        # bigK = jnp.kron(jnp.eye(zdim), trial.K[0])
-        # bigR = jnp.kron(jnp.eye(n), R)
-
-        # A = bigK @ bigC.T
-
-        # z = A @ solve(bigC @ A + bigR, y)
-        # z = z.reshape((zdim, -1)).T
         trial.z = z
