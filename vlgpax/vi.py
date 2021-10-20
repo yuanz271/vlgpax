@@ -22,6 +22,7 @@
 # L: Array(M, T, T), K = LL'
 # V: Array(M, T, T), posterior covariance
 ######################
+import math
 import random
 import time
 from typing import Union, Sequence, Callable
@@ -36,6 +37,7 @@ from sklearn.decomposition import FactorAnalysis
 
 from .model import Session, Params
 from .util import diag_embed, capped_exp, cholesky_solve
+from . import gpfa
 
 
 __all__ = ['fit', 'infer', 'reconstruct_cov']
@@ -87,6 +89,7 @@ def e_loss_newton(y, Cz, Cx, z, x, v, K, L, logdet, eps: float):
     u = v @ (Cz**2)
     lnr = x @ Cx + z @ Cz
     r = capped_exp(lnr + 0.5 * u)  # [x, z] C
+    # r = capped_exp(lnr)
     w = r @ (Cz.T**2)
     z3d = jnp.expand_dims(z.T, -1)
     z_div_K = cholesky_solve(L, z3d)
@@ -153,9 +156,9 @@ def estep(session: Session,
             if jnp.isclose(0.5 * lam, 0.):
                 break
 
-            if new_loss > loss:
+            if new_loss > loss and i > max_iter // 2:
                 warnings.warn('E: loss increased')
-                break
+                # break
 
             delta = jnp.clip(delta, a_min=-clip, a_max=clip)
             if invalid(delta):
@@ -203,6 +206,7 @@ def trial_m_loss_newton(y, C, Cz, M, v):
     u = v @ (Cz**2)
     lnr = M @ C
     r = capped_exp(lnr + 0.5 * u)
+    # r = capped_exp(lnr)
     loss = jnp.mean(jnp.sum(r - y * lnr, axis=-1))
 
     R = diag_embed(r.T)  # (ydim, T, T)
@@ -229,9 +233,9 @@ def session_m_loss_newton(session, C, Cz):
         s += np.prod(M.shape)
 
         loss_i, g_i, H_i = trial_m_loss_newton(y, C, Cz, M, v)
-        loss += loss_i
-        g += g_i
-        H += H_i
+        loss = loss + loss_i
+        g = g + g_i
+        H = H + H_i
 
         # assert jnp.all(H.diagonal(axis1=-2, axis2=-1) > 0.)
     g_div_H = solve(H, jnp.expand_dims(g, -1))
@@ -251,13 +255,6 @@ def mstep(session: Session,
     zdim = params.n_factors
     C = params.C  # (zdim + xdim, ydim)
 
-    # concat trials
-    # y = session.y
-    # x = session.x
-    # z = session.z
-    # v = session.v
-    # M = jnp.column_stack((z, x))
-
     loss = jnp.nan
     for i in range(max_iter):
         # loss, delta, lam = m_loss_newton(y, C, C[:zdim, :], M, v)
@@ -266,9 +263,9 @@ def mstep(session: Session,
         if jnp.isclose(0.5 * lam, 0.):
             break
 
-        if new_loss > loss:
+        if new_loss > loss and i > max_iter // 2:
             warnings.warn('M: loss increased')
-            break
+            # break
 
         delta = jnp.clip(delta, a_min=-clip, a_max=clip)
         if invalid(delta):
@@ -279,7 +276,9 @@ def mstep(session: Session,
     else:
         warnings.warn(f'M: maximum number of iterations reached')
         pass
-
+    
+    # normalize C
+    # params.C = C / jnp.linalg.norm(C)
     params.C = C
     return loss
 
@@ -300,15 +299,20 @@ def preprocess(session: Session, params: Params, initialize: Callable) -> None:
 
 
 def make_em_session(session: Session, T: int) -> Session:
-    y = session.y
-    x = session.x
     em_session = Session(session.binsize)
-    n_trials = y.shape[0] // T
-    y = y[:n_trials * T]
-    x = x[:n_trials * T]
-    for i, (yi, xi) in enumerate(
-            zip(jnp.split(y, n_trials), jnp.split(x, n_trials))):
-        em_session.add_trial(i, y=yi, x=xi)
+    i = 0
+    for trial in session.trials:
+        l = trial.y.shape[0]
+        if l < T:
+            raise RuntimeError('Cut length must not be longer than the shortest trial.')
+        if l == T:
+            s = [0]  # is this shortcut necessary?
+        else:
+            n_trials = math.ceil(l / T)
+            s = jnp.linspace(start=0, stop=l - T, num=n_trials).astype(int)
+        for si in s:
+            i += 1
+            em_session.add_trial(i, y=trial.y[si:si+T], x=trial.x[si:si+T])
 
     return em_session
 
@@ -337,7 +341,8 @@ def init(session, params):
     if params.C is None:
         params.C = jax.random.normal(key, (n_factors + n_regressors, n_channels)) / \
                         jnp.sqrt((n_factors + n_regressors) * n_channels)
-
+        params.gpfa.C = params.C
+    
     # init kernels
     unique_Ts = np.unique([trial.T for trial in session.trials] +
                           [params.args.trial_length])
@@ -370,6 +375,39 @@ def init(session, params):
     return session, params, em_session
 
 
+def em(session, params):
+    loss = jnp.inf
+    for i in range(params.args.max_iter):
+        tick = time.perf_counter()
+        mstep(session, params)
+        tock = time.perf_counter()
+        m_elapsed = tock - tick
+
+        tick = time.perf_counter()
+        new_loss = estep(session, params)
+        tock = time.perf_counter()
+        e_elapsed = tock - tick
+
+        typer.echo(f'EM Iteration {i + 1}, \tLoss = {new_loss:.4f}, \t'
+                    f'M step: {m_elapsed:.2f}s, \t'
+                    f'E step: {e_elapsed:.2f}s')
+
+        if jnp.isnan(new_loss):
+            typer.secho('EM: stopped at NaN loss',
+                        fg=typer.colors.WHITE,
+                        bg=typer.colors.RED,
+                        err=True)
+            break
+        if jnp.isclose(loss, new_loss, rtol=1e-05, atol=1e-05):
+            typer.echo('EM: stopped at convergence')
+            break
+        if new_loss > loss:
+            warnings.warn('EM: loss increased')
+            # break
+
+        loss = new_loss
+
+
 def fit(session: Session, n_factors: int, kernel: Union[Callable, Sequence[Callable]],
         *, seed=None, **kwargs):
     params = Params(n_factors, kernel, seed=seed)
@@ -377,48 +415,31 @@ def fit(session: Session, n_factors: int, kernel: Union[Callable, Sequence[Calla
         vars(params.args).update(kwargs)
     session, params, em_session = init(session, params)
 
-    loss = jnp.inf
     try:
-        for i in range(params.args.max_iter):
-            tick = time.perf_counter()
+        if params.args.gpfa:
+            params.gpfa.C = params.C
+            gpfa.fit(em_session, params)
+            params.C = params.gpfa.C
             mstep(em_session, params)
-            tock = time.perf_counter()
-            m_elapsed = tock - tick
-
-            tick = time.perf_counter()
-            new_loss = estep(em_session, params)
-            tock = time.perf_counter()
-            e_elapsed = tock - tick
-
-            typer.echo(f'EM Iteration {i + 1}, \tLoss = {new_loss:.4f}, \t'
-                       f'M step: {m_elapsed:.2f}s, \t'
-                       f'E step: {e_elapsed:.2f}s')
-
-            if jnp.isnan(new_loss):
-                typer.secho('EM: stopped at NaN loss',
-                            fg=typer.colors.WHITE,
-                            bg=typer.colors.RED,
-                            err=True)
-                break
-            if jnp.isclose(loss, new_loss):
-                typer.echo('EM: stopped at convergence')
-                break
-            if new_loss > loss:
-                warnings.warn('EM: loss increased')
-                break
-
-            loss = new_loss
+        else:
+            em(em_session, params)
     except KeyboardInterrupt:
         typer.echo('Aborted')
 
     typer.echo('Inferring')
-    estep(session, params, verbose=True)
+    infer(session, params, new_session=False)
     typer.secho('Finished', fg=typer.colors.GREEN, bold=True)
 
     return session, params
 
 
-def infer(session, params) -> Session:
-    preprocess(session, params, params.initialize)
+def infer(session, params, new_session: bool = True) -> Session:
+    if new_session:
+        preprocess(session, params, params.initialize)
+    if params.args.gpfa:
+        gpfa.infer(session, params)
     estep(session, params, verbose=True)
     return session
+
+fit2 = fit
+infer2 = infer
