@@ -20,15 +20,23 @@ class Args:
         clip: value for clipping newton step
         eps: small positive value for numerical stability
         stepsize: stepsize for damped newton's method
+        gpfa: flag to use GPFA to accelerate
     """
     max_iter: int = 50
     e_max_iter: int = 20
     m_max_iter: int = 20
     fast: bool = True
     trial_length: int = 100
-    clip: float = 3.
+    clip: float = 1.
     eps: float = 1e-6
     stepsize: float = 1.
+    gpfa: bool = True
+
+
+@dataclass
+class GPFAParams:
+    C: Optional[Any] = None  # (n_factors + n_regressors, n_channels)
+    R: Optional[Any] = None  # (n_channels,)
 
 
 @dataclass
@@ -46,11 +54,13 @@ class Params:
     n_factors: int
     kernel: Iterable[Callable] = None
     C: Optional[Any] = None  # (n_factors + n_regressors, n_channels)
+    R: Optional[Any] = None  # (n_channels,)
     K: Optional[Any] = None  # (n_factors, T, T)
     L: Optional[Any] = None  # (n_factors, T, T)
     logdet: Optional[Any] = None  # (n_factors, T)
     seed: Optional[int] = None  # random seed for reproducibility
     args: Args = field(default=Args(), repr=False, init=False)  # EM algorithm settings
+    gpfa: GPFAParams = field(default=Args(), repr=False, init=False)
 
     def __post_init__(self):
         if isinstance(self.kernel, Callable):
