@@ -22,6 +22,7 @@
 # L: Array(M, T, T), K = LL'
 # V: Array(M, T, T), posterior covariance
 ######################
+import copy
 import math
 import random
 import time
@@ -317,6 +318,21 @@ def make_em_session(session: Session, T: int) -> Session:
     return em_session
 
 
+def make_jit_stuff(session: Session, params):
+    jit_session = Session(session.binsize)
+    trial = copy.deepcopy(session.trials[0])
+    jit_session.trials.append(trial)
+    
+    jit_params = copy.deepcopy(params)
+    jit_params.args = copy.deepcopy(params.args)
+    jit_params.args.max_iter = 1
+    jit_params.args.e_max_iter = 1
+    jit_params.args.m_max_iter = 1
+
+    return jit_session, jit_params
+
+
+
 def init(session, params):
     assert session.trials
     if params.seed is None:
@@ -372,6 +388,9 @@ def init(session, params):
 
     params.initialize = fa.transform
 
+    # fake session for JIT
+
+
     return session, params, em_session
 
 
@@ -415,6 +434,20 @@ def fit(session: Session, n_factors: int, kernel: Union[Callable, Sequence[Calla
         vars(params.args).update(kwargs)
     session, params, em_session = init(session, params)
 
+    jit_session, jit_params = make_jit_stuff(em_session, params)
+    
+    typer.echo('JIT')
+    try:
+        if jit_params.args.gpfa:
+            jit_params.gpfa.C = jit_params.C
+            gpfa.fit(jit_session, jit_params)
+            jit_params.C = jit_params.gpfa.C
+            mstep(jit_session, jit_params)
+        else:
+            em(jit_session, jit_params)
+    except KeyboardInterrupt:
+        typer.echo('Aborted')
+    
     try:
         if params.args.gpfa:
             params.gpfa.C = params.C
