@@ -319,40 +319,18 @@ def make_em_session(session: Session, T: int) -> Session:
 
 
 def make_jit_stuff(session: Session, params):
-    key = jax.random.PRNGKey(params.seed)
     jit_session = Session(session.binsize)
-    jit_session.add_trial(0, y=jax.random.normal(key, (session.trials[0].y.shape[0], 2)))
-
-    for trial in jit_session.trials:
-        T = trial.y.shape[0]
-        if trial.z is None:      
-            trial.z = jnp.zeros((T, 2))
-        assert trial.z.shape[0] == T
-        if trial.v is None:
-            trial.v = jnp.ones_like(trial.z)
-        if trial.w is None:
-            trial.w = jnp.ones_like(trial.z)
-        trial.K = params.K[T]
-        trial.L = params.L[T]
-        trial.logdet = params.logdet[T]
+    trial = copy.deepcopy(session.trials[0])
+    jit_session.trials.append(trial)
     
     jit_params = copy.deepcopy(params)
-    jit_params.n_factors = 2
     jit_params.args = copy.deepcopy(params.args)
     jit_params.args.max_iter = 1
     jit_params.args.e_max_iter = 1
     jit_params.args.m_max_iter = 1
 
-    n_channels = 2
-    n_regressors = trial.x.shape[-1]
-    n_factors = jit_params.n_factors
-
-    jit_params.C = jax.random.normal(key, (n_factors + n_regressors, n_channels)) / \
-                    jnp.sqrt((n_factors + n_regressors) * n_channels)
-    jit_params.gpfa.C = jit_params.C
-
-
     return jit_session, jit_params
+
 
 
 def init(session, params):
