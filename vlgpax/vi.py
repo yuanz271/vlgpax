@@ -158,7 +158,7 @@ def estep(session: Session,
 
             if new_loss > loss and i > max_iter // 2:
                 warnings.warn('E: loss increased')
-                # break
+                break
 
             delta = jnp.clip(delta, a_min=-clip, a_max=clip)
             if invalid(delta):
@@ -265,7 +265,7 @@ def mstep(session: Session,
 
         if new_loss > loss and i > max_iter // 2:
             warnings.warn('M: loss increased')
-            # break
+            break
 
         delta = jnp.clip(delta, a_min=-clip, a_max=clip)
         if invalid(delta):
@@ -403,7 +403,7 @@ def em(session, params):
             break
         if new_loss > loss:
             warnings.warn('EM: loss increased')
-            # break
+            break
 
         loss = new_loss
 
