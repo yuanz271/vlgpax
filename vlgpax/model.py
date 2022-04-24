@@ -30,7 +30,7 @@ class Args:
     clip: float = 1.
     eps: float = 1e-6
     stepsize: float = 1.
-    gpfa: bool = True
+    gpfa: bool = False
 
 
 @dataclass
