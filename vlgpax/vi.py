@@ -96,14 +96,14 @@ def e_loss_newton(y, Cz, Cx, z, x, v, K, L, logdet, eps: float):
 
     V = reconstruct_cov(K, w, eps)
     v = V.diagonal(axis1=-2, axis2=-1).T
-    ll = jnp.sum(r - y * lnr)  # likelihood
-    lp = 0.5 * jnp.sum(
+    nll = jnp.sum(r - y * lnr)  # negative likelihood
+    nlp = 0.5 * jnp.sum(
         logdet + jnp.squeeze(jnp.transpose(z3d, (0, 2, 1)) @ z_div_K, -1) +
         jnp.trace(cholesky_solve(L, V), axis1=-2, axis2=-1))
-    lq = -0.5 * jnp.sum(
+    nlq = 0.5 * jnp.sum(
         jnp.log(jnp.linalg.cholesky(V).diagonal(axis1=-2, axis2=-1)).sum(-1) *
         2)
-    loss = ll + lp + lq
+    loss = nll + nlp - nlq
 
     # Newton step
     g = z_div_K + jnp.expand_dims(Cz @ (r - y).T, -1)  # (zdim, T, 1)
