@@ -443,3 +443,74 @@ def infer(session, params, new_session: bool = True) -> Session:
 
 fit2 = fit
 infer2 = infer
+
+
+@jax.jit
+def single_trial_elbo(y, Cz, Cx, z, x, v, K, L, logdet, eps=1e-8):
+    """ELBO
+    :param y: spike train
+    :param Cz: loading matrix corresponding to latent factors, (n_factors, n_neurons)
+    :param Cx: loading matrix corresponding to regressors, (n_regressors, n_neurons)
+    :param z: latent factors, (T, n_factors)
+    :param x: design matrix, (T, n_regressors)
+    :param v: posterior variances, (T, n_factors)
+    :param K: kernel matrices
+    :param L: kernel square roots
+    :param logdet: kernel log determinants
+    :param eps: small positive value to avoid numerical issues
+    """
+    u = v @ (Cz**2)
+    lnr = x @ Cx + z @ Cz
+    r = jnp.exp(lnr + 0.5 * u)  # [x, z] C
+    w = r @ (Cz.T**2)
+    T, D = z.shape
+    z3d = jnp.expand_dims(z.T, -1)
+    z_div_K = cholesky_solve(L, z3d)
+
+    V = reconstruct_cov(K, w, eps)
+    v = V.diagonal(axis1=-2, axis2=-1).T
+    ll = jnp.sum(y * lnr - r)  # - jax.scipy.special.gammaln(y + 1))  # y * ln(rate) - rate - ln(y!)
+    nlp = .5 * jnp.sum(
+        logdet + jnp.squeeze(jnp.transpose(z3d, (0, 2, 1)) @ z_div_K, -1) +
+        jnp.trace(cholesky_solve(L, V), axis1=-2, axis2=-1))
+    nlq = .5 * jnp.sum(
+        jnp.log(jnp.linalg.cholesky(V).diagonal(axis1=-2, axis2=-1)).sum(-1) *
+        2)
+    l = ll + nlq - nlp  # + T * D
+    
+    return l
+
+
+def elbo(session, params, eps=1e-8):
+    zdim = params.n_factors
+    C = params.C  # (zdim + xdim, ydim)
+    Cz, Cx = jnp.vsplit(C, [zdim])  # (n_factors + n_regressors, n_channels)
+    
+    l = 0.
+    for trial in session.trials:  # parallelizable
+        x = trial.x  # regressors
+        z = trial.z
+        y = trial.y
+        v = trial.v
+        w = trial.w
+        K = trial.K
+        L = trial.L
+        logdet = trial.logdet
+
+        l += single_trial_elbo(y, Cz, Cx, z, x, v, K, L, logdet, eps)
+    
+    return l
+
+
+def null_elbo(session, params):
+    zdim = params.n_factors
+    Y = jnp.concatenate([trial.y for trial in session.trials], axis=0)
+    R = jnp.mean(Y, axis=0, keepdims=True)  # mean firing rate
+    lnR = jnp.log(R)  # (1, n_channels)
+
+    l = jnp.sum(Y * lnR - R)
+    for trial in session.trials:  # parallelizable
+        T = trial.z.shape[0]
+        l -= T * zdim
+    
+    return l
