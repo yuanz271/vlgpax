@@ -1,8 +1,10 @@
 import math
 from typing import Any, Callable, Optional
 
+import scipy as sp
 import jax
 from jax import numpy as jnp
+from jax import scipy as jsp
 from jax import vmap
 
 
@@ -61,6 +63,15 @@ class RBF:
         D = cdist(x / self.lengthscale, y / self.lengthscale)
         K = self.scale * jnp.exp(-0.5 * D) + J
         return K
+
+    def toeplitz_matrix(self, x: Array):
+        J = jnp.eye(x.shape[0]) * self.jitter
+        tau = x - x[0]
+        c = self.toeplitz(tau)
+        return sp.linalg.toeplitz(c) + J
+
+    def toeplitz(self, tau: Array):
+        return self.scale * jnp.exp(-0.5 * (tau / self.lengthscale) ** 2)
 
 
 class RFF:

@@ -1,5 +1,6 @@
 import jax
 from jax import numpy as jnp
+import numpy as np
 
 from context import vlgpax
 from vlgpax import kernel
@@ -51,3 +52,11 @@ def test_RBF():
 
     Kxy = ker(x, y)
     assert Kxy.shape == (Nx, Ny)
+    
+    # circulant
+    Nx = 5
+    x = jnp.expand_dims(jnp.arange(Nx), -1)
+    ker = kernel.RBF(scale, lengthscale, jitter=0.)
+    Kxx = ker(x)
+    C = ker.toeplitz_matrix(x)
+    assert np.allclose(Kxx, C)
