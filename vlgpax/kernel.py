@@ -5,7 +5,8 @@ import jax
 from jax import numpy as jnp
 from jax import vmap
 
-__all__ = ['RBF', 'RFF']
+
+__all__ = ['Matern32', 'RBF', 'RFF']
 PRNGKey = Any
 Array = Any
 
@@ -15,8 +16,32 @@ def sqdist(x: Array, y: Array) -> Array:
     return jnp.inner(d, d)
 
 
+def edist(x: Array, y: Array) -> Array:
+    return jnp.sqrt(sqdist(x, y))
+
+
 def cdist(x: Array, y: Array, dist: Callable = sqdist) -> Array:
     return vmap(lambda a: vmap(lambda b: dist(a, b))(y))(x)
+
+
+class Matern32:
+    def __init__(self,
+                 scale: float = 1.,
+                 lengthscale: float = 1.,
+                 jitter=1e-5) -> None:
+        self.scale = scale
+        self.lengthscale = lengthscale
+        self.jitter = jitter
+
+    def __call__(self, x: Array, y: Optional[Array] = None):
+        J = 0.
+        if y is None:
+            y = x
+            J = jnp.eye(x.shape[0]) * self.jitter
+
+        D = jnp.sqrt(3) * cdist(x, y, dist=edist) / self.lengthscale
+        K = self.scale * (1 + D) * jnp.exp(-D) + J
+        return K
 
 
 class RBF:
